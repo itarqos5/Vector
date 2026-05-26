@@ -74,8 +74,10 @@ public final class EuFrontendHandler extends ChannelInboundHandlerAdapter {
                     closeOnFlush(outboundChannel);
                     return;
                 }
+                if (outboundChannel.pipeline().get("proxy-protocol-v2") != null) {
+                    outboundChannel.pipeline().remove("proxy-protocol-v2");
+                }
                 inboundChannel.config().setAutoRead(true);
-                inboundChannel.read();
             });
         });
     }
@@ -84,7 +86,12 @@ public final class EuFrontendHandler extends ChannelInboundHandlerAdapter {
     public void channelRead(final ChannelHandlerContext ctx, final Object msg) {
         final Channel out = outboundChannel;
         if (out != null && out.isActive()) {
-            out.writeAndFlush(msg).addListener(ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE);
+            out.writeAndFlush(msg).addListener((ChannelFutureListener) future -> {
+                if (!future.isSuccess()) {
+                    closeOnFlush(out);
+                    closeOnFlush(ctx.channel());
+                }
+            });
             return;
         }
         ReferenceCountUtil.release(msg);
