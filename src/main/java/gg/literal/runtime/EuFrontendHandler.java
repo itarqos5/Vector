@@ -59,8 +59,10 @@ public final class EuFrontendHandler extends ChannelInboundHandlerAdapter {
 
         connectFuture.addListener((ChannelFutureListener) future -> {
             if (!future.isSuccess()) {
+                final Throwable cause = future.cause();
+                final String reason = cause == null ? "unknown" : cause.getClass().getSimpleName() + ": " + cause.getMessage();
                 TerminalLogger.warn("Backend connection failed from " + formatAddress(inboundChannel.remoteAddress())
-                    + " to " + config.backendHost() + ":" + config.backendPort());
+                    + " to " + config.backendHost() + ":" + config.backendPort() + " (" + reason + ")");
                 closeOnFlush(inboundChannel);
                 return;
             }
