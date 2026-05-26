@@ -1,6 +1,8 @@
 package gg.literal.runtime;
 
 import gg.literal.config.VectorConfig;
+import gg.literal.console.VectorConsole;
+import gg.literal.detect.BackendDetector;
 import gg.literal.log.TerminalLogger;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.PooledByteBufAllocator;
@@ -11,12 +13,24 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 
+import java.nio.file.Path;
+
 public final class VectorRuntime {
 
     private VectorRuntime() {
     }
 
     public static void boot(final VectorConfig config) {
+        final BanList banList = new BanList(Path.of("ban-list.txt"));
+        banList.load();
+
+        final ConnectionRegistry registry = new ConnectionRegistry();
+
+        TerminalLogger.info("Probing backend at " + config.backendHost() + ":" + config.backendPort() + "...");
+        BackendDetector.detect(config.backendHost(), config.backendPort());
+
+        new VectorConsole(registry, banList).start();
+
         EventLoopGroup bossGroup = null;
         EventLoopGroup workerGroup = null;
 
@@ -32,7 +46,7 @@ public final class VectorRuntime {
                 .childOption(ChannelOption.SO_KEEPALIVE, true)
                 .childOption(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)
                 .childOption(ChannelOption.RCVBUF_ALLOCATOR, new AdaptiveRecvByteBufAllocator(64, 2048, 65536))
-                .childHandler(new SecurePipelineInitializer(config));
+                .childHandler(new SecurePipelineInitializer(config, registry, banList));
 
             final Channel server = bootstrap.bind(config.bindHost(), config.bindPort()).syncUninterruptibly().channel();
             TerminalLogger.info(

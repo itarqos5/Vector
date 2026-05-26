@@ -28,16 +28,28 @@ import java.net.InetSocketAddress;
 public final class EuFrontendHandler extends ChannelInboundHandlerAdapter {
 
     private final VectorConfig config;
+    private final ConnectionRegistry registry;
     private volatile Channel outboundChannel;
+    private String clientAddressKey;
 
-    public EuFrontendHandler(final VectorConfig config) {
+    public EuFrontendHandler(final VectorConfig config, final ConnectionRegistry registry) {
         this.config = config;
+        this.registry = registry;
     }
 
     @Override
     public void channelActive(final ChannelHandlerContext ctx) {
         final Channel inboundChannel = ctx.channel();
+        clientAddressKey = ConnectionRegistry.toAddressKey(inboundChannel);
+        final String clientIp = ConnectionRegistry.toIp(inboundChannel);
+        registry.register(clientAddressKey, inboundChannel);
+
         inboundChannel.config().setAutoRead(false);
+
+        // Honour one-shot backend override set by the "send" console command
+        final java.net.InetSocketAddress backendOverride = registry.pollNextBackend(clientIp);
+        final String backendHost = backendOverride != null ? backendOverride.getHostString() : config.backendHost();
+        final int backendPort = backendOverride != null ? backendOverride.getPort() : config.backendPort();
 
         final Bootstrap bootstrap = new Bootstrap()
             .group(inboundChannel.eventLoop())
@@ -56,7 +68,7 @@ public final class EuFrontendHandler extends ChannelInboundHandlerAdapter {
                 }
             });
 
-        final ChannelFuture connectFuture = bootstrap.connect(config.backendHost(), config.backendPort());
+        final ChannelFuture connectFuture = bootstrap.connect(backendHost, backendPort);
         outboundChannel = connectFuture.channel();
 
         connectFuture.addListener((ChannelFutureListener) future -> {
@@ -64,7 +76,7 @@ public final class EuFrontendHandler extends ChannelInboundHandlerAdapter {
                 final Throwable cause = future.cause();
                 final String reason = cause == null ? "unknown" : cause.getClass().getSimpleName() + ": " + cause.getMessage();
                 TerminalLogger.warn("Backend connection failed from " + formatAddress(inboundChannel.remoteAddress())
-                    + " to " + config.backendHost() + ":" + config.backendPort() + " (" + reason + ")");
+                    + " to " + backendHost + ":" + backendPort + " (" + reason + ")");
                 closeOnFlush(inboundChannel);
                 return;
             }
@@ -107,6 +119,9 @@ public final class EuFrontendHandler extends ChannelInboundHandlerAdapter {
 
     @Override
     public void channelInactive(final ChannelHandlerContext ctx) {
+        if (clientAddressKey != null) {
+            registry.unregister(clientAddressKey);
+        }
         closeOnFlush(outboundChannel);
     }
 
