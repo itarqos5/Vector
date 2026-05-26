@@ -45,13 +45,21 @@ target/vector-1.0.0-SNAPSHOT.jar
 java -jar target/vector-1.0.0-SNAPSHOT.jar
 ```
 
+On Windows, you can also run:
+
+```bat
+run.bat
+```
+
+First start generates `eula.txt` (if missing) and exits by design. Set `eula=true` and start again.
+
 ---
 
 ## Project Structure
 
 ```
 Vector/
-├── pom.xml
+├─> pom.xml
 └── src/
     └── main/
         └── java/

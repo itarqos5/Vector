@@ -33,5 +33,14 @@ Thumbs.db
 *.log
 logs/
 
+# Runtime-generated bootstrap state
+eula.txt
+config.json
+libraries/
+tests/eula.txt
+tests/config.json
+tests/libraries/
+tests/vector-1.0.0-SNAPSHOT.jar
+
 # GitHub
 .github/
