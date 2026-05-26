@@ -11,6 +11,7 @@ public final class VectorConfig {
     private final long maxBytesPerSecond;
     private final long maxPacketsPerSecond;
     private final int connectTimeoutMs;
+    private final boolean proxyProtocol;
 
     public VectorConfig(
         final String bindHost,
@@ -21,7 +22,8 @@ public final class VectorConfig {
         final int workerThreads,
         final long maxBytesPerSecond,
         final long maxPacketsPerSecond,
-        final int connectTimeoutMs
+        final int connectTimeoutMs,
+        final boolean proxyProtocol
     ) {
         this.bindHost = bindHost;
         this.bindPort = bindPort;
@@ -32,6 +34,7 @@ public final class VectorConfig {
         this.maxBytesPerSecond = maxBytesPerSecond;
         this.maxPacketsPerSecond = maxPacketsPerSecond;
         this.connectTimeoutMs = connectTimeoutMs;
+        this.proxyProtocol = proxyProtocol;
     }
 
     public static VectorConfig defaults() {
@@ -47,7 +50,8 @@ public final class VectorConfig {
             workerDefault,
             2_097_152L,
             4000L,
-            3000
+            3000,
+            false
         );
     }
 
@@ -97,5 +101,9 @@ public final class VectorConfig {
 
     public int connectTimeoutMs() {
         return connectTimeoutMs;
+    }
+
+    public boolean proxyProtocol() {
+        return proxyProtocol;
     }
 }

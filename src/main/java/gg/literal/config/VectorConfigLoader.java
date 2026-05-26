@@ -13,6 +13,7 @@ public final class VectorConfigLoader {
 
     private static final Pattern STRING_PATTERN = Pattern.compile("\"([a-z\\-]+)\"\\s*:\\s*\"([^\"]*)\"");
     private static final Pattern NUMBER_PATTERN = Pattern.compile("\"([a-z\\-]+)\"\\s*:\\s*([0-9]+)");
+    private static final Pattern BOOLEAN_PATTERN = Pattern.compile("\"([a-z\\-]+)\"\\s*:\\s*(true|false)");
 
     private VectorConfigLoader() {
     }
@@ -40,6 +41,7 @@ public final class VectorConfigLoader {
         long maxBytesPerSecond = defaults.maxBytesPerSecond();
         long maxPacketsPerSecond = defaults.maxPacketsPerSecond();
         int connectTimeoutMs = defaults.connectTimeoutMs();
+        boolean proxyProtocol = defaults.proxyProtocol();
 
         final Matcher stringMatcher = STRING_PATTERN.matcher(content);
         while (stringMatcher.find()) {
@@ -73,6 +75,15 @@ public final class VectorConfigLoader {
             }
         }
 
+        final Matcher booleanMatcher = BOOLEAN_PATTERN.matcher(content);
+        while (booleanMatcher.find()) {
+            final String key = booleanMatcher.group(1);
+            final boolean value = Boolean.parseBoolean(booleanMatcher.group(2));
+            if ("proxy-protocol".equals(key)) {
+                proxyProtocol = value;
+            }
+        }
+
         return new VectorConfig(
             bindHost,
             bindPort,
@@ -82,7 +93,8 @@ public final class VectorConfigLoader {
             workerThreads,
             maxBytesPerSecond,
             maxPacketsPerSecond,
-            connectTimeoutMs
+            connectTimeoutMs,
+            proxyProtocol
         );
     }
 
@@ -96,7 +108,8 @@ public final class VectorConfigLoader {
             + "  \"worker-threads\": " + defaults.workerThreads() + ",\n"
             + "  \"max-bytes-per-second\": " + defaults.maxBytesPerSecond() + ",\n"
             + "  \"max-packets-per-second\": " + defaults.maxPacketsPerSecond() + ",\n"
-            + "  \"connect-timeout-ms\": " + defaults.connectTimeoutMs() + "\n"
+            + "  \"connect-timeout-ms\": " + defaults.connectTimeoutMs() + ",\n"
+            + "  \"proxy-protocol\": " + defaults.proxyProtocol() + "\n"
             + "}\n";
         try {
             Files.writeString(path, content, StandardCharsets.UTF_8);

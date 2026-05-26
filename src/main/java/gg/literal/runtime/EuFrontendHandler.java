@@ -49,7 +49,9 @@ public final class EuFrontendHandler extends ChannelInboundHandlerAdapter {
             .handler(new ChannelInitializer<SocketChannel>() {
                 @Override
                 protected void initChannel(final SocketChannel ch) {
-                    ch.pipeline().addLast("proxy-protocol-v2", HAProxyMessageEncoder.INSTANCE);
+                    if (config.proxyProtocol()) {
+                        ch.pipeline().addLast("proxy-protocol-v2", HAProxyMessageEncoder.INSTANCE);
+                    }
                     ch.pipeline().addLast("backend-relay", new BackendRelayHandler(inboundChannel));
                 }
             });
@@ -67,20 +69,24 @@ public final class EuFrontendHandler extends ChannelInboundHandlerAdapter {
                 return;
             }
 
-            final HAProxyMessage header = buildProxyV2Header(inboundChannel, outboundChannel);
-            outboundChannel.writeAndFlush(header).addListener((ChannelFutureListener) writeFuture -> {
-                if (!writeFuture.isSuccess()) {
-                    TerminalLogger.warn("Failed sending Proxy Protocol header for "
-                        + formatAddress(inboundChannel.remoteAddress()));
-                    closeOnFlush(inboundChannel);
-                    closeOnFlush(outboundChannel);
-                    return;
-                }
-                if (outboundChannel.pipeline().get("proxy-protocol-v2") != null) {
-                    outboundChannel.pipeline().remove("proxy-protocol-v2");
-                }
+            if (config.proxyProtocol()) {
+                final HAProxyMessage header = buildProxyV2Header(inboundChannel, outboundChannel);
+                outboundChannel.writeAndFlush(header).addListener((ChannelFutureListener) writeFuture -> {
+                    if (!writeFuture.isSuccess()) {
+                        TerminalLogger.warn("Failed sending Proxy Protocol header for "
+                            + formatAddress(inboundChannel.remoteAddress()));
+                        closeOnFlush(inboundChannel);
+                        closeOnFlush(outboundChannel);
+                        return;
+                    }
+                    if (outboundChannel.pipeline().get("proxy-protocol-v2") != null) {
+                        outboundChannel.pipeline().remove("proxy-protocol-v2");
+                    }
+                    inboundChannel.config().setAutoRead(true);
+                });
+            } else {
                 inboundChannel.config().setAutoRead(true);
-            });
+            }
         });
     }
 
