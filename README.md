@@ -55,21 +55,6 @@ First start generates `eula.txt` (if missing) and exits by design. Set `eula=tru
 
 ---
 
-## Project Structure
-
-```
-Vector/
-├─> pom.xml
-└── src/
-    └── main/
-        └── java/
-            └── gg/
-                └── literal/
-                    └── VectorLauncher.java
-```
-
----
-
 ## License
 
 MIT

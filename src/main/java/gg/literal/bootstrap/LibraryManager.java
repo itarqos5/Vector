@@ -87,7 +87,7 @@ public final class LibraryManager {
         return new ChildFirstClassLoader(
             urls.toArray(URL[]::new),
             ClassLoader.getSystemClassLoader(),
-            List.of("gg.literal.runtime.", "io.netty.")
+            List.of("gg.literal.runtime.", "gg.literal.console.", "gg.literal.detect.", "io.netty.")
         );
     }
 

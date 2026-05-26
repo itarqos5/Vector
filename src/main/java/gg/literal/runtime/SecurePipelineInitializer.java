@@ -19,6 +19,7 @@ public final class SecurePipelineInitializer extends ChannelInitializer<SocketCh
     @Override
     protected void initChannel(final SocketChannel channel) {
         channel.pipeline().addLast("ban-check", banCheckHandler);
+        channel.pipeline().addLast("mc-sniffer", new MinecraftProtocolSniffer());
         channel.pipeline().addLast("packet-limiter", new PacketLimiterHandler(
             config.maxBytesPerSecond(),
             config.maxPacketsPerSecond()

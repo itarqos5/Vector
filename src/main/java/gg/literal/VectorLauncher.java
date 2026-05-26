@@ -83,6 +83,7 @@ public final class VectorLauncher {
                 "cmd.exe",
                 "/k",
                 "java",
+                "--enable-native-access=ALL-UNNAMED",
                 "-jar",
                 jarPath.toAbsolutePath().toString(),
                 "--attached-console"
