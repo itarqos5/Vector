@@ -71,6 +71,19 @@ public final class MinecraftProtocolSniffer extends ChannelInboundHandlerAdapter
     }
 
     // -------------------------------------------------------------------------
+    // Validation
+    // -------------------------------------------------------------------------
+
+    /** Returns true for valid Minecraft usernames: 3-16 chars, [a-zA-Z0-9_] only. */
+    private static boolean isValidMinecraftName(final String name) {
+        if (name == null || name.length() < 3 || name.length() > 16) return false;
+        for (final char c : name.toCharArray()) {
+            if (c != '_' && !Character.isLetterOrDigit(c)) return false;
+        }
+        return true;
+    }
+
+    // -------------------------------------------------------------------------
     // Packet parsing
     // -------------------------------------------------------------------------
 
@@ -126,10 +139,17 @@ public final class MinecraftProtocolSniffer extends ChannelInboundHandlerAdapter
                 if (packetId == 0x00) { // Login Start
                     final String name = readString(); // player name (max 16 chars)
                     // Skip UUID field — we only need the name
-                    if (name != null && !name.isBlank()) {
+                    if (isValidMinecraftName(name)) {
                         playerName = name;
                         TerminalLogger.info("[JOIN] " + name + " (" + clientIp + ") is connecting");
+                    } else {
+                        // Binary/custom protocol or invalid name — stop sniffing this connection
+                        state = State.IGNORED;
                     }
+                } else if (packetId == 0x01) { // Encryption Response (online-mode)
+                    // All subsequent C->S bytes are now AES/CFB8 encrypted — we cannot parse them.
+                    // The join was already logged from Login Start above; leave is still logged.
+                    state = State.IGNORED;
                 } else if (packetId == 0x03) { // Login Acknowledged (1.20.2+)
                     state = State.CONFIGURATION;
                 }
