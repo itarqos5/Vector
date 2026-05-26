@@ -25,6 +25,7 @@ public final class LibraryManager {
         "netty-buffer",
         "netty-transport",
         "netty-codec",
+        "netty-codec-haproxy",
         "netty-handler"
     );
 
