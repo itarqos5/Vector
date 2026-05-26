@@ -6,7 +6,6 @@ import gg.literal.runtime.ConnectionRegistry;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
-import java.net.InetSocketAddress;
 import java.util.List;
 
 public final class VectorConsole {
@@ -104,13 +103,8 @@ public final class VectorConsole {
                     TerminalLogger.warn("Invalid port: " + parts[3]);
                     return;
                 }
-                registry.setNextBackend(ip, new InetSocketAddress(destHost, destPort));
-                final int kicked = registry.kickByIp(ip);
-                if (kicked > 0) {
-                    TerminalLogger.info("Disconnected " + ip + " -> will reconnect to " + destHost + ":" + destPort);
-                } else {
-                    TerminalLogger.info("No active session for " + ip + " -- override set for next connection to " + destHost + ":" + destPort);
-                }
+                registry.sendToServer(ip, destHost, destPort);
+                TerminalLogger.info("[SEND] Transferring " + ip + " -> " + destHost + ":" + destPort);
             }
 
             case "ban" -> {
