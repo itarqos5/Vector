@@ -7,6 +7,7 @@ public final class TerminalLogger {
 
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss.SSS");
     private static final Object LOCK = new Object();
+    private static final boolean ANSI_ENABLED = detectAnsiSupport();
 
     private static final String RESET = "\u001B[0m";
     private static final String GREEN = "\u001B[32m";
@@ -33,7 +34,7 @@ public final class TerminalLogger {
 
     public static void fatal(final String message) {
         final String timestamp = LocalTime.now().format(FORMATTER);
-        final String level = BRIGHT_RED_BG + FLASH + "[FATAL]" + RESET;
+        final String level = colorize("[FATAL]", BRIGHT_RED_BG + FLASH);
         synchronized (LOCK) {
             System.err.println("[" + timestamp + "] " + level + " " + message);
         }
@@ -42,9 +43,60 @@ public final class TerminalLogger {
 
     private static void log(final String level, final String levelColor, final String messageColor, final String message) {
         final String timestamp = LocalTime.now().format(FORMATTER);
-        final String colorizedLevel = levelColor + "[" + level + "]" + RESET;
+        final String colorizedLevel = colorize("[" + level + "]", levelColor);
+        final String colorizedMessage = colorize(message, messageColor);
         synchronized (LOCK) {
-            System.out.println("[" + timestamp + "] " + colorizedLevel + " " + messageColor + message + RESET);
+            System.out.println("[" + timestamp + "] " + colorizedLevel + " " + colorizedMessage);
         }
+    }
+
+    private static String colorize(final String value, final String colorCode) {
+        if (!ANSI_ENABLED) {
+            return value;
+        }
+        return colorCode + value + RESET;
+    }
+
+    private static boolean detectAnsiSupport() {
+        final String override = System.getenv("VECTOR_ANSI");
+        if (override != null) {
+            if ("true".equalsIgnoreCase(override) || "1".equals(override)) {
+                return true;
+            }
+            if ("false".equalsIgnoreCase(override) || "0".equals(override)) {
+                return false;
+            }
+        }
+
+        if (System.console() == null) {
+            return false;
+        }
+
+        final String os = System.getProperty("os.name", "").toLowerCase();
+        final boolean windows = os.contains("win");
+        if (!windows) {
+            return true;
+        }
+
+        if (System.getenv("WT_SESSION") != null) {
+            return true;
+        }
+        if (System.getenv("ANSICON") != null) {
+            return true;
+        }
+        if ("ON".equalsIgnoreCase(System.getenv("ConEmuANSI"))) {
+            return true;
+        }
+
+        final String term = System.getenv("TERM");
+        if (term != null && term.toLowerCase().contains("xterm")) {
+            return true;
+        }
+
+        if (System.getenv("PROMPT") != null) {
+            return false;
+        }
+
+        return System.getenv("PSModulePath") != null;
     }
 }
