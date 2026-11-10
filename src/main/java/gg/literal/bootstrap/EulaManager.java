@@ -12,6 +12,24 @@ public final class EulaManager {
     }
 
     public static void verifyOrCreate(final Path eulaPath) throws BootstrapException {
+        verifyOrCreate(eulaPath, System.getenv());
+    }
+
+    /**
+     * Like {@link #verifyOrCreate(Path)} but an explicit {@code VECTOR_EULA=true} environment variable counts as
+     * acceptance (and is recorded in eula.txt). Containers cannot edit the file interactively, so this is how
+     * they accept the Minecraft EULA; it is never set implicitly.
+     */
+    static void verifyOrCreate(final Path eulaPath, final java.util.Map<String, String> env) throws BootstrapException {
+        if ("true".equalsIgnoreCase(String.valueOf(env.get("VECTOR_EULA")).trim())) {
+            final String accepted = "# Accepted through the VECTOR_EULA environment variable (https://aka.ms/MinecraftEULA).\neula=true\n";
+            try {
+                Files.writeString(eulaPath, accepted, StandardCharsets.UTF_8);
+            } catch (IOException ex) {
+                throw new BootstrapException("Unable to write eula.txt", ex);
+            }
+            return;
+        }
         if (Files.notExists(eulaPath)) {
             createDefaultEula(eulaPath);
             throw new BootstrapException("EULA file was missing and has been generated. Set eula=true in eula.txt to continue.");
