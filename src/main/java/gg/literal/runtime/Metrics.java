@@ -29,6 +29,12 @@ public final class Metrics {
     /** Connections closed for being idle or for not completing the handshake in time. */
     public final LongAdder timeouts = new LongAdder();
 
+    /** Sum of every refusal counter, for rate charts. */
+    public long blockedTotal() {
+        return blockedBan.sum() + blockedConnectionLimit.sum() + blockedConnectionRate.sum()
+            + blockedPacketLimit.sum() + blockedGlobalLimit.sum() + blockedWhitelist.sum();
+    }
+
     private Metrics() {
     }
 }
