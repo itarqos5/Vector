@@ -181,6 +181,7 @@ public final class DashboardServer {
             final Map<String, Object> body = readBody(ex);
             if (body == null) return;
             final Result result = perform(body, clientIp(ex));
+            baseStateCache = null; // the next poll must see this change immediately
             sendJson(ex, result.ok() ? 200 : 400, result.ok() ? ok(result.message()) : error(result.message()));
         } else {
             sendJson(ex, 404, error("Not found"));
@@ -328,11 +329,43 @@ public final class DashboardServer {
     // ------------------------------------------------------------------ state
 
     private Map<String, Object> state(final HttpExchange ex) {
-        final Metrics m = Metrics.INSTANCE;
-        final VectorConfig cfg = ctx.config.get();
         final Map<String, String> query = query(ex);
         final long historySeq = longParam(query, "history");
         final long logSeq = longParam(query, "log");
+
+        final Map<String, Object> root = new LinkedHashMap<>(baseState());
+        appendIncremental(root, historySeq, logSeq);
+        return root;
+    }
+
+    private static final long BASE_STATE_TTL_MS = 1000L;
+    private volatile Map<String, Object> baseStateCache;
+    private volatile long baseStateAt;
+
+    /**
+     * The client-independent part of the state (totals, backends, connections, bans, whitelist). Several
+     * dashboards polling every two seconds share one snapshot per second instead of each rebuilding it.
+     */
+    private Map<String, Object> baseState() {
+        final long now = System.currentTimeMillis();
+        final Map<String, Object> cached = baseStateCache;
+        if (cached != null && now - baseStateAt < BASE_STATE_TTL_MS) {
+            return cached;
+        }
+        synchronized (this) {
+            if (baseStateCache != null && now - baseStateAt < BASE_STATE_TTL_MS) {
+                return baseStateCache;
+            }
+            final Map<String, Object> built = buildBaseState();
+            baseStateCache = built;
+            baseStateAt = now;
+            return built;
+        }
+    }
+
+    private Map<String, Object> buildBaseState() {
+        final Metrics m = Metrics.INSTANCE;
+        final VectorConfig cfg = ctx.config.get();
 
         final Map<String, Object> root = new LinkedHashMap<>();
         root.put("now", System.currentTimeMillis());
@@ -408,7 +441,11 @@ public final class DashboardServer {
         whitelist.put("enabled", cfg.access().whitelistEnabled());
         whitelist.put("entries", ctx.whitelist.entries());
         root.put("whitelist", whitelist);
+        return root;
+    }
 
+    /** Per-client part: history points and log lines newer than the cursors the client sent. */
+    private void appendIncremental(final Map<String, Object> root, final long historySeq, final long logSeq) {
         final List<Object> points = new ArrayList<>();
         long latestHistory = historySeq;
         for (final MetricsHistory.Point p : ctx.history.since(historySeq)) {
@@ -440,7 +477,6 @@ public final class DashboardServer {
         }
         root.put("logs", logs);
         root.put("logSeq", latestLog);
-        return root;
     }
 
     /** Current settings as in config.json, with secrets replaced by whether they are set. */
