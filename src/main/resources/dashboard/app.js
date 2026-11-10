@@ -377,7 +377,8 @@
     const outBps = last ? last.outBps : 0;
 
     $('sOnline').textContent = fmtNumber(d.totals.connectionsActive);
-    $('sOnlineSub').textContent = `${fmtNumber(d.totals.connectionsTotal)} since start`;
+    const peakAt = d.totals.peakConnectionsAt ? ` at ${fmtClock(d.totals.peakConnectionsAt)}` : '';
+    $('sOnlineSub').textContent = `Peak ${fmtNumber(d.totals.peakConnections)}${peakAt} · ${fmtNumber(d.totals.connectionsTotal)} since start`;
     $('sTraffic').textContent = fmtRate(inBps + outBps);
     $('sTrafficSub').textContent = `${fmtBytes(d.totals.bytesFromClients + d.totals.bytesToClients)} relayed in total`;
 
@@ -387,12 +388,21 @@
 
     const blocked = Object.values(d.blocked).reduce((a, b) => a + b, 0);
     $('sBlocked').textContent = fmtNumber(blocked);
-    const parts = [];
-    if (d.blocked.ban) parts.push(`${d.blocked.ban} banned`);
-    if (d.blocked.connectionLimit + d.blocked.connectionRate) parts.push(`${d.blocked.connectionLimit + d.blocked.connectionRate} over limit`);
-    if (d.blocked.packetLimit) parts.push(`${d.blocked.packetLimit} flooding`);
-    if (d.blocked.whitelist) parts.push(`${d.blocked.whitelist} not whitelisted`);
-    $('sBlockedSub').textContent = parts.length ? parts.join(', ') : 'Nothing refused';
+    // Every refusal reason the proxy counts, in the order an operator most wants to see them.
+    const reasons = [
+      ['ban', 'banned'],
+      ['host', 'wrong host name'],
+      ['connectionLimit', 'too many connections'],
+      ['connectionRate', 'connecting too fast'],
+      ['globalLimit', 'server full'],
+      ['packetLimit', 'flooding'],
+      ['whitelist', 'not whitelisted'],
+      ['maintenance', 'during maintenance'],
+      ['protocol', 'unsupported version'],
+    ];
+    const parts = reasons.filter(([key]) => d.blocked[key]).map(([key, label]) => `${fmtNumber(d.blocked[key])} ${label}`);
+    $('sBlockedSub').textContent = parts.length ? parts.join(' · ') : 'Nothing refused';
+    $('sBlockedSub').title = parts.join('\n');
 
     drawRouteMap(d, last);
     if (state.tab === 'overview') drawCharts();
