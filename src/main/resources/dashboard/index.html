@@ -14,6 +14,8 @@
   <form id="loginForm" class="login-card" autocomplete="off">
     <div class="brand"><svg class="glyph" viewBox="0 0 32 32" aria-hidden="true"><path d="M8 9l8 15 8-15"/></svg><span class="brand-name">Vector</span></div>
     <h1 class="login-title">Sign in to the dashboard</h1>
+    <!-- Password managers expect a username next to a password field; the dashboard only has a password. -->
+    <input type="text" name="username" value="vector" autocomplete="username" hidden tabindex="-1" aria-hidden="true">
     <label class="field">
       <span class="label">Password</span>
       <input id="loginPassword" type="password" required autofocus autocomplete="current-password">
