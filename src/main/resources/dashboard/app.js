@@ -150,6 +150,33 @@
     applyTheme(next);
   });
 
+  // ------------------------------------------------------------------ confirmation
+
+  /** Asks before a destructive action. Resolves true only when the operator presses the confirm button. */
+  function confirmAction({ title, message, confirm = 'Confirm' }) {
+    const dialog = $('confirmDialog');
+    $('confirmTitle').textContent = title;
+    $('confirmMessage').textContent = message;
+    $('confirmOk').textContent = confirm;
+    return new Promise((resolve) => {
+      const done = (value) => {
+        $('confirmForm').removeEventListener('submit', onSubmit);
+        $('confirmCancel').removeEventListener('click', onCancel);
+        dialog.removeEventListener('close', onClose);
+        if (dialog.open) dialog.close();
+        resolve(value);
+      };
+      const onSubmit = (event) => { event.preventDefault(); done(true); };
+      const onCancel = () => done(false);
+      const onClose = () => done(false); // Escape key
+      $('confirmForm').addEventListener('submit', onSubmit);
+      $('confirmCancel').addEventListener('click', onCancel);
+      dialog.addEventListener('close', onClose);
+      dialog.showModal();
+      $('confirmCancel').focus();
+    });
+  }
+
   // ------------------------------------------------------------------ session
 
   function showLogin() {
@@ -752,7 +779,15 @@
         h('td', { text: expires }),
         h('td', { text: b.reason || '–' }),
         h('td', null, h('div', { class: 'row-actions' },
-          h('button', { class: 'ghost small-btn', text: 'Unban', onclick: () => act({ action: 'unban', target: b.target }, 'Unbanned.') })))));
+          h('button', {
+            class: 'ghost small-btn',
+            text: 'Unban',
+            onclick: async () => {
+              if (await confirmAction({ title: `Unban ${b.target}?`, message: 'Connections from this address or range will be accepted again.', confirm: 'Unban' })) {
+                act({ action: 'unban', target: b.target }, 'Unbanned.');
+              }
+            },
+          })))));
     }
 
     const wl = d.whitelist;
@@ -767,7 +802,15 @@
       wlBody.append(h('tr', null,
         h('td', { class: 'mono', text: entry }),
         h('td', null, h('div', { class: 'row-actions' },
-          h('button', { class: 'ghost small-btn', text: 'Remove', onclick: () => act({ action: 'whitelist-remove', entry }, 'Removed.') })))));
+          h('button', {
+            class: 'ghost small-btn',
+            text: 'Remove',
+            onclick: async () => {
+              if (await confirmAction({ title: `Remove ${entry} from the whitelist?`, message: 'They will no longer be able to join while the whitelist or maintenance mode is on.', confirm: 'Remove' })) {
+                act({ action: 'whitelist-remove', entry }, 'Removed.');
+              }
+            },
+          })))));
     }
   }
 

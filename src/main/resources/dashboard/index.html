@@ -255,6 +255,17 @@
   </form>
 </dialog>
 
+<dialog id="confirmDialog" class="dialog" aria-labelledby="confirmTitle">
+  <form method="dialog" id="confirmForm">
+    <h2 id="confirmTitle" class="dialog-title"></h2>
+    <p id="confirmMessage" class="muted"></p>
+    <div class="dialog-actions">
+      <button type="button" class="ghost" id="confirmCancel">Cancel</button>
+      <button type="submit" class="danger" id="confirmOk">Confirm</button>
+    </div>
+  </form>
+</dialog>
+
 <div id="toasts" class="toasts" role="status" aria-live="polite"></div>
 
 <script src="/app.js" defer></script>
