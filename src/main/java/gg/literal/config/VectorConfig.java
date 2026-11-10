@@ -21,7 +21,8 @@ public record VectorConfig(
     Status status,
     Access access,
     Metrics metrics,
-    Dashboard dashboard
+    Dashboard dashboard,
+    Policy policy
 ) {
 
     /** A single upstream server. */
@@ -112,6 +113,15 @@ public record VectorConfig(
     public record Dashboard(boolean enabled, String host, int port, String password) {
     }
 
+    /**
+     * Connection policy knobs.
+     *
+     * @param logChat whether chat and commands are parsed and logged; turning it off lets the protocol sniffer
+     *                stop inspecting packets once a player is in game, which saves CPU on busy offline-mode backends
+     */
+    public record Policy(boolean logChat) {
+    }
+
     public static VectorConfig defaults() {
         final int available = Runtime.getRuntime().availableProcessors();
         final int workerDefault = Math.max(1, available - 1);
@@ -136,7 +146,8 @@ public record VectorConfig(
             new Status(true, 5000, "§cServer is currently offline", true),
             new Access(false, "§cYou are not whitelisted on this server."),
             new Metrics(false, "127.0.0.1", 9100, ""),
-            new Dashboard(true, "127.0.0.1", 3000, "")
+            new Dashboard(true, "127.0.0.1", 3000, ""),
+            new Policy(true)
         );
     }
 

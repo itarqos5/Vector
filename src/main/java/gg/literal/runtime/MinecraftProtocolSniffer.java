@@ -251,7 +251,8 @@ public final class MinecraftProtocolSniffer extends ChannelDuplexHandler {
             }
             case CONFIGURATION -> {
                 if (packetId == 0x03) { // Acknowledge Configuration (1.20.2+)
-                    state = State.PLAY;
+                    // Without chat logging there is nothing left to parse, so stop inspecting this connection.
+                    state = config.get().policy().logChat() ? State.PLAY : State.IGNORED;
                 }
             }
             case PLAY -> {

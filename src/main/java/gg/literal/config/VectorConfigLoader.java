@@ -8,6 +8,7 @@ import gg.literal.config.VectorConfig.Dashboard;
 import gg.literal.config.VectorConfig.BalanceMode;
 import gg.literal.config.VectorConfig.Limits;
 import gg.literal.config.VectorConfig.Metrics;
+import gg.literal.config.VectorConfig.Policy;
 import gg.literal.config.VectorConfig.Status;
 
 import java.io.IOException;
@@ -135,9 +136,14 @@ public final class VectorConfigLoader {
             throw new IllegalArgumentException("dashboard-port must differ from metrics-port (both are " + metrics.port() + ")");
         }
 
+        final Policy dp = d.policy();
+        final Policy policy = new Policy(
+            bool(root, "log-chat", dp.logChat())
+        );
+
         return new VectorConfig(
             bindHost, bindPort, bossThreads, workerThreads, maxBytes, maxPackets,
-            connectTimeout, proxyProtocol, backends, limits, status, access, metrics, dashboard
+            connectTimeout, proxyProtocol, backends, limits, status, access, metrics, dashboard, policy
         );
     }
 
@@ -279,6 +285,7 @@ public final class VectorConfigLoader {
         line(sb, "metrics-host", Json.quote(d.metrics().host()));
         line(sb, "metrics-port", d.metrics().port());
         line(sb, "metrics-token", Json.quote(d.metrics().token()));
+        line(sb, "log-chat", d.policy().logChat());
         line(sb, "dashboard-enabled", d.dashboard().enabled());
         line(sb, "dashboard-host", Json.quote(d.dashboard().host()));
         line(sb, "dashboard-port", d.dashboard().port());

@@ -18,7 +18,7 @@ final class TestConfigs {
         return new VectorConfig(
             d.bindHost(), d.bindPort(), d.bossThreads(), d.workerThreads(), d.maxBytesPerSecond(),
             d.maxPacketsPerSecond(), d.connectTimeoutMs(), d.proxyProtocol(), backends, d.limits(),
-            d.status(), d.access(), d.metrics(), d.dashboard());
+            d.status(), d.access(), d.metrics(), d.dashboard(), d.policy());
     }
 
     static BackendTarget target(final String name, final int port, final int weight) {
