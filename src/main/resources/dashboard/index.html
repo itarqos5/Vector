@@ -42,6 +42,7 @@
     </nav>
     <div class="top-right">
       <span id="liveState" class="live" data-state="connecting"><span class="live-dot"></span><span id="liveText">Connecting</span></span>
+      <button id="helpBtn" class="ghost" type="button" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)">?</button>
       <button id="themeBtn" class="ghost" type="button" aria-label="Colour theme">Theme: auto</button>
       <button id="signout" class="ghost" hidden>Sign out</button>
     </div>
@@ -277,6 +278,19 @@
       <button type="submit" class="danger">Ban and disconnect</button>
     </div>
   </form>
+</dialog>
+
+<dialog id="helpDialog" class="dialog" aria-labelledby="helpTitle">
+  <h2 id="helpTitle" class="dialog-title">Keyboard shortcuts</h2>
+  <dl class="shortcuts">
+    <dt><kbd>1</kbd> – <kbd>7</kbd></dt><dd>Overview, Players, Backends, Activity, Access, Logs, Config</dd>
+    <dt><kbd>/</kbd></dt><dd>Focus the search box on the current tab</dd>
+    <dt><kbd>t</kbd></dt><dd>Cycle the colour theme</dd>
+    <dt><kbd>r</kbd></dt><dd>Refresh now</dd>
+    <dt><kbd>?</kbd></dt><dd>Show this list</dd>
+    <dt><kbd>Esc</kbd></dt><dd>Close a dialog</dd>
+  </dl>
+  <div class="dialog-actions"><button type="button" class="ghost" id="helpClose">Close</button></div>
 </dialog>
 
 <dialog id="evacDialog" class="dialog" aria-labelledby="evacTitle">

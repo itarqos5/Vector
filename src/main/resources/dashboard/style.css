@@ -297,6 +297,11 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .switch input:checked::after { transform: translateX(14px); }
 @media (prefers-reduced-motion: reduce) { .switch input, .switch input::after { transition: none; } }
 
+kbd { font: 12px var(--mono); padding: 1px 6px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; background: var(--surface-2); }
+.shortcuts { display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; margin: 0 0 14px; }
+.shortcuts dt, .shortcuts dd { margin: 0; }
+.shortcuts dd { color: var(--ink-2); font-size: 14px; }
+
 /* ---------- login, dialog, toasts ---------- */
 
 .login { min-height: 100vh; display: grid; place-items: center; padding: 24px; }

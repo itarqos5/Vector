@@ -1089,6 +1089,34 @@
     if (ok) loadConfig();
   });
 
+  // ------------------------------------------------------------------ keyboard
+
+  const TAB_ORDER = ['overview', 'players', 'backends', 'activity', 'access', 'logs', 'config'];
+  const SEARCH_FIELD = { players: 'playerFilter', logs: 'logSearch', config: 'configFilter' };
+
+  document.addEventListener('keydown', (event) => {
+    if (event.ctrlKey || event.metaKey || event.altKey) return;
+    const target = event.target;
+    const typing = target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName));
+    if (typing || document.querySelector('dialog[open]') || $('app').hidden) return;
+
+    if (event.key >= '1' && event.key <= String(TAB_ORDER.length)) {
+      selectTab(TAB_ORDER[Number(event.key) - 1]);
+    } else if (event.key === '/' && SEARCH_FIELD[state.tab]) {
+      event.preventDefault();
+      $(SEARCH_FIELD[state.tab]).focus();
+    } else if (event.key === 't') {
+      $('themeBtn').click();
+    } else if (event.key === 'r') {
+      poll(true);
+    } else if (event.key === '?') {
+      $('helpDialog').showModal();
+    }
+  });
+
+  $('helpBtn').addEventListener('click', () => $('helpDialog').showModal());
+  $('helpClose').addEventListener('click', () => $('helpDialog').close());
+
   // ------------------------------------------------------------------ start
 
   applyTheme(THEMES.includes(prefs.get('theme', 'auto')) ? prefs.get('theme', 'auto') : 'auto');
