@@ -1,12 +1,20 @@
 package gg.literal.runtime;
 
 import gg.literal.bootstrap.BootstrapException;
+import gg.literal.config.Json;
 import gg.literal.config.VectorConfig;
 import gg.literal.config.VectorConfigLoader;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
@@ -60,6 +68,45 @@ public final class ConfigHolder {
             listener.accept(next);
         }
         return restartRequired;
+    }
+
+    /**
+     * Changes some top-level keys of the config file and reloads. The edited document is validated in a
+     * temporary file first, so an invalid change never touches the real config.json; the file is then replaced
+     * atomically. Note that rewriting normalises the formatting of the file.
+     *
+     * @return settings that changed but need a restart (see {@link #reload()})
+     */
+    public synchronized List<String> update(final Map<String, Object> changes) throws BootstrapException {
+        final Map<String, Object> root;
+        try {
+            root = Files.exists(path)
+                ? Json.parseObject(Files.readString(path, StandardCharsets.UTF_8))
+                : new LinkedHashMap<>();
+        } catch (IOException | IllegalArgumentException ex) {
+            throw new BootstrapException("Cannot edit " + path.getFileName() + ": " + ex.getMessage(), ex);
+        }
+        root.putAll(changes);
+
+        final Path temp = path.resolveSibling(path.getFileName() + ".tmp");
+        try {
+            Files.writeString(temp, Json.writePretty(root), StandardCharsets.UTF_8);
+            VectorConfigLoader.load(temp); // throws if the edited document is invalid
+            try {
+                Files.move(temp, path, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            } catch (AtomicMoveNotSupportedException ex) {
+                Files.move(temp, path, StandardCopyOption.REPLACE_EXISTING);
+            }
+        } catch (IOException ex) {
+            throw new BootstrapException("Cannot write " + path.getFileName() + ": " + ex.getMessage(), ex);
+        } finally {
+            try {
+                Files.deleteIfExists(temp);
+            } catch (IOException ignored) {
+                // leftover temp file is harmless
+            }
+        }
+        return reload();
     }
 
     private static void check(final List<String> out, final String key, final Object before, final Object after) {
