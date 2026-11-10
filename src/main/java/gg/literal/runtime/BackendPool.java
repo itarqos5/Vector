@@ -18,6 +18,7 @@ public final class BackendPool {
     private final ConfigHolder config;
     private volatile List<Backend> backends = List.of();
     private volatile VectorConfig.BalanceMode mode = VectorConfig.BalanceMode.ROUND_ROBIN;
+    private volatile RouteTable routes = RouteTable.EMPTY;
 
     private final AtomicInteger roundRobin = new AtomicInteger();
     private final Object weightedLock = new Object();
@@ -48,6 +49,7 @@ public final class BackendPool {
             next.add(backend);
         }
         this.mode = settings.mode();
+        this.routes = RouteTable.of(settings.routes());
         this.backends = List.copyOf(next);
     }
 
@@ -80,6 +82,25 @@ public final class BackendPool {
         return count;
     }
 
+    /**
+     * Backends allowed to serve players who connected with {@code host}, as lower-cased names, or {@code null}
+     * when no route restricts that host.
+     */
+    public Set<String> allowedFor(final String host) {
+        return routes.lookup(host == null ? "" : host);
+    }
+
+    /** Like {@link #availableCount()} but only counting backends in {@code allowed} (null = all). */
+    public int availableCount(final Set<String> allowed) {
+        int count = 0;
+        for (final Backend backend : backends) {
+            if (backend.available() && (allowed == null || allowed.contains(backend.nameKey()))) {
+                count++;
+            }
+        }
+        return count;
+    }
+
     public Backend find(final String host, final int port) {
         for (final Backend backend : backends) {
             if (backend.port() == port && backend.host().equalsIgnoreCase(host)) {
@@ -106,10 +127,18 @@ public final class BackendPool {
      * @return the chosen backend with its connection slot already acquired, or {@code null} if none is available
      */
     public Backend select(final String clientIp, final Set<Backend> excluded) {
+        return select(clientIp, excluded, null);
+    }
+
+    /**
+     * Like {@link #select(String, Set)} but restricted to the backends whose lower-cased names are in
+     * {@code allowed} (the result of {@link #allowedFor}); {@code null} means no restriction.
+     */
+    public Backend select(final String clientIp, final Set<Backend> excluded, final Set<String> allowed) {
         final List<Backend> all = backends;
         int usable = 0;
         for (int i = 0; i < all.size(); i++) {
-            if (usable(all.get(i), excluded)) {
+            if (usable(all.get(i), excluded, allowed)) {
                 usable++;
             }
         }
@@ -118,27 +147,29 @@ public final class BackendPool {
         }
 
         final Backend chosen = switch (mode) {
-            case ROUND_ROBIN -> nth(all, excluded, Math.floorMod(roundRobin.getAndIncrement(), usable));
-            case LEAST_CONNECTIONS -> leastConnections(all, excluded);
-            case WEIGHTED -> weighted(all, excluded);
-            case IP_HASH -> nth(all, excluded, Math.floorMod(clientIp.hashCode(), usable));
-            case RANDOM -> nth(all, excluded, ThreadLocalRandom.current().nextInt(usable));
-            case LEAST_LATENCY -> leastLatency(all, excluded);
+            case ROUND_ROBIN -> nth(all, excluded, allowed, Math.floorMod(roundRobin.getAndIncrement(), usable));
+            case LEAST_CONNECTIONS -> leastConnections(all, excluded, allowed);
+            case WEIGHTED -> weighted(all, excluded, allowed);
+            case IP_HASH -> nth(all, excluded, allowed, Math.floorMod(clientIp.hashCode(), usable));
+            case RANDOM -> nth(all, excluded, allowed, ThreadLocalRandom.current().nextInt(usable));
+            case LEAST_LATENCY -> leastLatency(all, excluded, allowed);
         };
         chosen.acquire();
         return chosen;
     }
 
-    private static boolean usable(final Backend backend, final Set<Backend> excluded) {
-        return backend.available() && backend.hasCapacity() && (excluded.isEmpty() || !excluded.contains(backend));
+    private static boolean usable(final Backend backend, final Set<Backend> excluded, final Set<String> allowed) {
+        return backend.available() && backend.hasCapacity()
+            && (allowed == null || allowed.contains(backend.nameKey()))
+            && (excluded.isEmpty() || !excluded.contains(backend));
     }
 
     /** The {@code index}-th usable backend in configuration order (no intermediate list is allocated). */
-    private static Backend nth(final List<Backend> all, final Set<Backend> excluded, final int index) {
+    private static Backend nth(final List<Backend> all, final Set<Backend> excluded, final Set<String> allowed, final int index) {
         int seen = 0;
         for (int i = 0; i < all.size(); i++) {
             final Backend backend = all.get(i);
-            if (usable(backend, excluded) && seen++ == index) {
+            if (usable(backend, excluded, allowed) && seen++ == index) {
                 return backend;
             }
         }
@@ -212,12 +243,12 @@ public final class BackendPool {
      * so one fast server is not flooded: score = (latency + 1) * (1 + open connections / weight). A backend with
      * no probe result yet is treated as slow.
      */
-    private static Backend leastLatency(final List<Backend> all, final Set<Backend> excluded) {
+    private static Backend leastLatency(final List<Backend> all, final Set<Backend> excluded, final Set<String> allowed) {
         Backend best = null;
         double bestScore = Double.MAX_VALUE;
         for (int i = 0; i < all.size(); i++) {
             final Backend candidate = all.get(i);
-            if (!usable(candidate, excluded)) {
+            if (!usable(candidate, excluded, allowed)) {
                 continue;
             }
             final long latency = candidate.latencyMs() < 0 ? 1000L : candidate.latencyMs();
@@ -231,12 +262,12 @@ public final class BackendPool {
         return best;
     }
 
-    private static Backend leastConnections(final List<Backend> all, final Set<Backend> excluded) {
+    private static Backend leastConnections(final List<Backend> all, final Set<Backend> excluded, final Set<String> allowed) {
         Backend best = null;
         double bestLoad = Double.MAX_VALUE;
         for (int i = 0; i < all.size(); i++) {
             final Backend candidate = all.get(i);
-            if (!usable(candidate, excluded)) {
+            if (!usable(candidate, excluded, allowed)) {
                 continue;
             }
             final double load = (double) candidate.activeConnections() / Math.max(1, candidate.weight());
@@ -249,13 +280,13 @@ public final class BackendPool {
     }
 
     /** Smooth weighted round-robin (the nginx algorithm): spreads picks evenly instead of in bursts. */
-    private Backend weighted(final List<Backend> all, final Set<Backend> excluded) {
+    private Backend weighted(final List<Backend> all, final Set<Backend> excluded, final Set<String> allowed) {
         synchronized (weightedLock) {
             int total = 0;
             Backend best = null;
             for (int i = 0; i < all.size(); i++) {
                 final Backend candidate = all.get(i);
-                if (!usable(candidate, excluded)) {
+                if (!usable(candidate, excluded, allowed)) {
                     continue;
                 }
                 final int weight = Math.max(1, candidate.weight());

@@ -200,6 +200,42 @@ class BackendPoolTest {
     }
 
     @Test
+    void routesRestrictWhichBackendsServeAHost() {
+        final BackendPool p = pool(BalanceMode.ROUND_ROBIN, 2,
+            TestConfigs.target("lobby", 1, 1), TestConfigs.target("survival", 2, 1), TestConfigs.target("creative", 3, 1));
+        final gg.literal.config.VectorConfig.Backends base = TestConfigs.withBackends(BalanceMode.ROUND_ROBIN, 2,
+            TestConfigs.target("lobby", 1, 1), TestConfigs.target("survival", 2, 1), TestConfigs.target("creative", 3, 1)).backends();
+        p.apply(new gg.literal.config.VectorConfig.Backends(base.targets(), base.mode(), base.healthIntervalMs(),
+            base.healthTimeoutMs(), base.healthFailThreshold(), base.maxConnectAttempts(), base.healthMode(),
+            java.util.List.of(
+                new gg.literal.config.VectorConfig.Route("lobby.example.com", java.util.List.of("lobby")),
+                new gg.literal.config.VectorConfig.Route("*.play.example.com", java.util.List.of("survival", "creative")))));
+
+        assertNull(p.allowedFor("unrouted.example.org"), "hosts without a route are unrestricted");
+
+        final Map<String, Integer> lobby = new LinkedHashMap<>();
+        for (int i = 0; i < 4; i++) {
+            lobby.merge(p.select("1.1.1.1", Set.of(), p.allowedFor("lobby.example.com")).name(), 1, Integer::sum);
+        }
+        assertEquals(Map.of("lobby", 4), lobby);
+
+        final Map<String, Integer> game = new LinkedHashMap<>();
+        for (int i = 0; i < 6; i++) {
+            game.merge(p.select("1.1.1.1", Set.of(), p.allowedFor("eu.play.example.com")).name(), 1, Integer::sum);
+        }
+        assertEquals(Map.of("survival", 3, "creative", 3), game);
+    }
+
+    @Test
+    void aRouteWhoseBackendsAreDownYieldsNothingInsteadOfLeakingToOthers() {
+        final BackendPool p = pool(BalanceMode.ROUND_ROBIN, 1,
+            TestConfigs.target("lobby", 1, 1), TestConfigs.target("other", 2, 1));
+        p.report(p.findByName("lobby"), false, -1);
+        assertNull(p.select("1.1.1.1", Set.of(), Set.of("lobby")));
+        assertEquals("other", p.select("1.1.1.1", Set.of(), null).name());
+    }
+
+    @Test
     void markInitialAppliesImmediately() {
         final BackendPool p = pool(BalanceMode.ROUND_ROBIN, 5, TestConfigs.target("a", 1, 1));
         final Backend a = p.findByName("a");

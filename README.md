@@ -121,6 +121,24 @@ Notes:
 - If the cache cannot get a status from any healthy backend, pings fall through to a normal proxied connection.
 - The whitelist matches the username sent at login. With offline-mode backends usernames can be spoofed, so combine it with IP entries there.
 
+### Host-based routing
+
+Send players who joined through different host names to different backends:
+
+```json
+"backends": [
+  { "name": "lobby-1",  "host": "10.0.0.11", "port": 25577 },
+  { "name": "lobby-2",  "host": "10.0.0.12", "port": 25577 },
+  { "name": "survival", "host": "10.0.0.21", "port": 25577 }
+],
+"routes": [
+  { "host": "lobby.example.com",  "backends": ["lobby-1", "lobby-2"] },
+  { "host": "*.play.example.com", "backends": ["survival"] }
+]
+```
+
+A host matches exactly first, then the most specific wildcard (`*.example.com` matches subdomains, not the bare domain), then a `"*"` catch-all. A host with no matching route may use every backend. Balancing, health, draining and caps apply inside the allowed set; if none of a route's backends is available the player is refused instead of being sent elsewhere. Routes are reloadable.
+
 ## Console commands
 
 | Command | Description |

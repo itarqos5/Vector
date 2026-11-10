@@ -9,6 +9,7 @@ public final class Backend {
     private final String host;
     private final int port;
     private volatile String name;
+    private volatile String nameKey;
     private volatile int weight;
     private volatile int maxConnections;
 
@@ -27,6 +28,7 @@ public final class Backend {
 
     Backend(final String name, final String host, final int port, final int weight, final int maxConnections) {
         this.name = name;
+        this.nameKey = name.toLowerCase(java.util.Locale.ROOT);
         this.host = host;
         this.port = port;
         this.weight = weight;
@@ -35,6 +37,11 @@ public final class Backend {
 
     public String name() {
         return name;
+    }
+
+    /** Lower-cased name, the form used by the route table. */
+    String nameKey() {
+        return nameKey;
     }
 
     public String host() {
@@ -105,6 +112,7 @@ public final class Backend {
 
     void update(final String newName, final int newWeight, final int newMaxConnections) {
         this.name = newName;
+        this.nameKey = newName.toLowerCase(java.util.Locale.ROOT);
         this.weight = newWeight;
         this.maxConnections = newMaxConnections;
     }

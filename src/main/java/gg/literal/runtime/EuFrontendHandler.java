@@ -85,6 +85,8 @@ public final class EuFrontendHandler extends ChannelInboundHandlerAdapter {
     private Backend held;
     private final Set<Backend> tried = new HashSet<>();
     private int attempts;
+    /** Backends this player's host name may use (null = all), fixed once at the start of the proxy phase. */
+    private Set<String> allowedBackends;
 
     public EuFrontendHandler(final VectorContext vc) {
         this.vc = vc;
@@ -295,6 +297,7 @@ public final class EuFrontendHandler extends ChannelInboundHandlerAdapter {
     private void beginProxy(final ChannelHandlerContext ctx, final boolean honourOverride) {
         mode = Mode.PROXY;
         cfg = vc.config.get();
+        allowedBackends = vc.pool.allowedFor(ctx.channel().attr(MinecraftProtocolSniffer.ATTR_HOSTNAME).get());
         ctx.channel().config().setAutoRead(false);
 
         // One-shot backend override set by the "send" console command.
@@ -316,7 +319,7 @@ public final class EuFrontendHandler extends ChannelInboundHandlerAdapter {
                 vc.pool.acquire(chosen);
             }
         } else {
-            chosen = vc.pool.select(clientIp, tried);
+            chosen = vc.pool.select(clientIp, tried, allowedBackends);
             if (chosen == null) {
                 TerminalLogger.warn("No healthy backend available for " + clientIp
                     + (tried.isEmpty() ? "" : " (after " + tried.size() + " failed attempt(s))"));
@@ -433,7 +436,7 @@ public final class EuFrontendHandler extends ChannelInboundHandlerAdapter {
         releasePending();
         final Integer nextState = ctx.channel().attr(MinecraftProtocolSniffer.ATTR_NEXT_STATE).get();
         // "Everything is full" deserves a different message than "everything is down".
-        final String message = vc.pool.availableCount() > 0
+        final String message = vc.pool.availableCount(allowedBackends) > 0
             ? vc.config.get().policy().fullMessage()
             : vc.config.get().status().offlineMotd();
         if (nextState != null && (nextState == 2 || nextState == 3) && !message.isEmpty() && ctx.channel().isActive()) {

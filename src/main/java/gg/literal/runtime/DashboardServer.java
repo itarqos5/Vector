@@ -502,6 +502,14 @@ public final class DashboardServer {
         }
         out.put("backends", backends);
         out.put("balance-mode", c.backends().mode().id());
+        final List<Object> routes = new ArrayList<>();
+        for (final VectorConfig.Route r : c.backends().routes()) {
+            final Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put("host", r.host());
+            entry.put("backends", r.backends());
+            routes.add(entry);
+        }
+        out.put("routes", routes);
         out.put("health-check-interval-ms", c.backends().healthIntervalMs());
         out.put("health-check-timeout-ms", c.backends().healthTimeoutMs());
         out.put("health-check-failures", c.backends().healthFailThreshold());
