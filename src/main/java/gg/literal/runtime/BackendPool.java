@@ -94,24 +94,41 @@ public final class BackendPool {
      * @return the chosen backend with its connection slot already acquired, or {@code null} if none is available
      */
     public Backend select(final String clientIp, final Set<Backend> excluded) {
-        final List<Backend> candidates = new ArrayList<>();
-        for (final Backend backend : backends) {
-            if (backend.healthy() && !excluded.contains(backend)) {
-                candidates.add(backend);
+        final List<Backend> all = backends;
+        int usable = 0;
+        for (int i = 0; i < all.size(); i++) {
+            if (usable(all.get(i), excluded)) {
+                usable++;
             }
         }
-        if (candidates.isEmpty()) {
+        if (usable == 0) {
             return null;
         }
 
         final Backend chosen = switch (mode) {
-            case ROUND_ROBIN -> candidates.get(Math.floorMod(roundRobin.getAndIncrement(), candidates.size()));
-            case LEAST_CONNECTIONS -> leastConnections(candidates);
-            case WEIGHTED -> weighted(candidates);
-            case IP_HASH -> candidates.get(Math.floorMod(clientIp.hashCode(), candidates.size()));
+            case ROUND_ROBIN -> nth(all, excluded, Math.floorMod(roundRobin.getAndIncrement(), usable));
+            case LEAST_CONNECTIONS -> leastConnections(all, excluded);
+            case WEIGHTED -> weighted(all, excluded);
+            case IP_HASH -> nth(all, excluded, Math.floorMod(clientIp.hashCode(), usable));
         };
         chosen.acquire();
         return chosen;
+    }
+
+    private static boolean usable(final Backend backend, final Set<Backend> excluded) {
+        return backend.healthy() && (excluded.isEmpty() || !excluded.contains(backend));
+    }
+
+    /** The {@code index}-th usable backend in configuration order (no intermediate list is allocated). */
+    private static Backend nth(final List<Backend> all, final Set<Backend> excluded, final int index) {
+        int seen = 0;
+        for (int i = 0; i < all.size(); i++) {
+            final Backend backend = all.get(i);
+            if (usable(backend, excluded) && seen++ == index) {
+                return backend;
+            }
+        }
+        throw new IllegalStateException("backend list changed during selection");
     }
 
     /** Acquires a connection slot on an explicitly requested backend (e.g. the {@code send} command). */
@@ -176,10 +193,14 @@ public final class BackendPool {
         return backend.name() + " (" + backend.address() + ")";
     }
 
-    private static Backend leastConnections(final List<Backend> candidates) {
+    private static Backend leastConnections(final List<Backend> all, final Set<Backend> excluded) {
         Backend best = null;
         double bestLoad = Double.MAX_VALUE;
-        for (final Backend candidate : candidates) {
+        for (int i = 0; i < all.size(); i++) {
+            final Backend candidate = all.get(i);
+            if (!usable(candidate, excluded)) {
+                continue;
+            }
             final double load = (double) candidate.activeConnections() / Math.max(1, candidate.weight());
             if (load < bestLoad) {
                 best = candidate;
@@ -190,11 +211,15 @@ public final class BackendPool {
     }
 
     /** Smooth weighted round-robin (the nginx algorithm): spreads picks evenly instead of in bursts. */
-    private Backend weighted(final List<Backend> candidates) {
+    private Backend weighted(final List<Backend> all, final Set<Backend> excluded) {
         synchronized (weightedLock) {
             int total = 0;
             Backend best = null;
-            for (final Backend candidate : candidates) {
+            for (int i = 0; i < all.size(); i++) {
+                final Backend candidate = all.get(i);
+                if (!usable(candidate, excluded)) {
+                    continue;
+                }
                 final int weight = Math.max(1, candidate.weight());
                 candidate.currentWeight += weight;
                 total += weight;
