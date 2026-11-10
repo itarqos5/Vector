@@ -149,6 +149,7 @@ Auto-ban counts three kinds of violation per IP: hitting the connection-rate lim
 | Command | Description |
 |---------|-------------|
 | `list` | Active connections with player name and backend. |
+| `players` / `find <name\|ip>` | List connected players with backend and session length, or search connections by name or IP. |
 | `backends` | Backend health, weight, open/total connections, failures and probe latency. |
 | `stats` | Traffic, blocked connections by reason, status ping counters. |
 | `drain <backend>` / `undrain <backend>` | Stop or resume sending new players to a backend; existing sessions continue. Useful before restarting a server. |

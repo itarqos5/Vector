@@ -77,6 +77,8 @@ public final class VectorConsole {
         switch (command) {
             case "help" -> printHelp();
             case "list" -> list();
+            case "players" -> players();
+            case "find" -> find(parts);
             case "kick" -> kick(parts);
             case "send" -> send(parts);
             case "ban" -> ban(parts);
@@ -117,6 +119,56 @@ public final class VectorConsole {
                 TerminalLogger.info("  " + entry);
             }
         }
+    }
+
+    /** Connected players (named connections only), grouped by backend. */
+    private void players() {
+        final List<gg.literal.runtime.ConnectionRegistry.ConnectionInfo> named = new java.util.ArrayList<>();
+        for (final var c : ctx.registry.snapshot()) {
+            if (c.player() != null) {
+                named.add(c);
+            }
+        }
+        if (named.isEmpty()) {
+            TerminalLogger.info("No players are connected.");
+            return;
+        }
+        named.sort(java.util.Comparator.comparing((gg.literal.runtime.ConnectionRegistry.ConnectionInfo c) ->
+            c.backend() == null ? "" : c.backend()).thenComparing(c -> c.player().toLowerCase()));
+        TerminalLogger.info("Players (" + named.size() + "):");
+        final long now = System.currentTimeMillis();
+        for (final var c : named) {
+            TerminalLogger.info(String.format("  %-16s %-39s %-14s %s", c.player(), c.ip(),
+                c.backend() == null ? "-" : c.backend(), formatDuration(now - c.connectedAtMillis())));
+        }
+    }
+
+    /** Finds connections by player name or IP (case-insensitive substring). */
+    private void find(final String[] parts) {
+        if (parts.length < 2) { TerminalLogger.warn("Usage: find <name|ip>"); return; }
+        final String needle = parts[1].toLowerCase();
+        int hits = 0;
+        final long now = System.currentTimeMillis();
+        for (final var c : ctx.registry.snapshot()) {
+            final String name = c.player() == null ? "" : c.player();
+            if (name.toLowerCase().contains(needle) || c.ip().contains(needle)) {
+                TerminalLogger.info("  " + (name.isEmpty() ? "(no login yet)" : name) + "  " + c.ip() + ":" + c.port()
+                    + "  -> " + (c.backend() == null ? "-" : c.backend()) + "  connected " + formatDuration(now - c.connectedAtMillis()));
+                hits++;
+            }
+        }
+        if (hits == 0) {
+            TerminalLogger.warn("No connection matches \"" + parts[1] + "\".");
+        }
+    }
+
+    private static String formatDuration(final long millis) {
+        long s = Math.max(0, millis / 1000);
+        final long h = s / 3600;
+        s %= 3600;
+        final long m = s / 60;
+        s %= 60;
+        return h > 0 ? h + "h " + m + "m" : m > 0 ? m + "m " + s + "s" : s + "s";
     }
 
     private void kick(final String[] parts) {
@@ -369,6 +421,8 @@ public final class VectorConsole {
         TerminalLogger.info("  version                       - show the Vector and Java versions");
         TerminalLogger.info("  maintenance [on|off]          - refuse logins except whitelisted players");
         TerminalLogger.info("  reload                        - reload config.json and whitelist.txt without restarting");
+        TerminalLogger.info("  players                       - connected players with backend and session length");
+        TerminalLogger.info("  find <name|ip>                - find connections by player name or IP");
         TerminalLogger.info("  kick <ip>                     - disconnect a player by IP");
         TerminalLogger.info("  send <ip> <backend>           - disconnect and route the next login to a named backend");
         TerminalLogger.info("  send <ip> <host> <port>        - transfer the client to another server (1.20.5+)");
