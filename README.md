@@ -79,6 +79,8 @@ First start generates `eula.txt` (if missing) and exits by design. Set `eula=tru
 
 Older configs that only set `backend-host` / `backend-port` keep working as a single backend named `main`.
 
+**Environment variables** override the file, which suits containers: `VECTOR_BIND_PORT=25570`, `VECTOR_DASHBOARD_HOST=0.0.0.0`, `VECTOR_DASHBOARD_PASSWORD=secret`, `VECTOR_BACKENDS='[{"name":"main","host":"10.0.0.2","port":25577}]'`. The name is `VECTOR_` plus the setting in upper case with `_` instead of `-`; values are read as JSON when they parse and as text otherwise. Check a setup without starting anything using `java -jar vector.jar --check-config`.
+
 | Key | Default | Reloadable | Description |
 |-----|---------|:---:|-------------|
 | `backends` | one local backend | yes | List of `{name, host, port, weight, max-connections}`. Names must be unique and contain no spaces. `max-connections` (optional, `0` = unlimited) caps the players on one backend; extra players overflow to the others. |

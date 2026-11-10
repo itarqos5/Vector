@@ -151,6 +151,25 @@ class VectorConfigLoaderTest {
     }
 
     @Test
+    void environmentVariablesOverrideTheFile() {
+        final java.util.Map<String, Object> root = Json.parseObject("{\"bind-port\": 25565, \"dashboard-host\": \"127.0.0.1\"}");
+        VectorConfigLoader.applyEnvironment(root, java.util.Map.of(
+            "VECTOR_BIND_PORT", "25570",
+            "VECTOR_DASHBOARD_HOST", "0.0.0.0",
+            "VECTOR_PROXY_PROTOCOL", "true",
+            "VECTOR_OFFLINE_MOTD", "Back soon",
+            "VECTOR_BACKENDS", "[{\"name\":\"a\",\"host\":\"h\",\"port\":1}]",
+            "PATH", "/usr/bin",
+            "VECTOR_", "ignored"));
+        assertEquals(25570L, root.get("bind-port"));
+        assertEquals("0.0.0.0", root.get("dashboard-host"));
+        assertEquals(Boolean.TRUE, root.get("proxy-protocol"));
+        assertEquals("Back soon", root.get("offline-motd"));
+        assertTrue(root.get("backends") instanceof java.util.List);
+        assertEquals(5, root.size()); // 2 from the file + proxy-protocol, offline-motd, backends
+    }
+
+    @Test
     void reportsUnknownBalanceModes() throws Exception {
         assertTrue(failure("{\"balance-mode\": \"fastest\"}").contains("balance-mode"));
     }

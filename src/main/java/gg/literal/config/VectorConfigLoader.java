@@ -52,10 +52,36 @@ public final class VectorConfigLoader {
             throw new BootstrapException(path.getFileName() + " is not valid JSON: " + ex.getMessage(), ex);
         }
 
+        applyEnvironment(root, System.getenv());
+
         try {
             return fromMap(root);
         } catch (IllegalArgumentException ex) {
             throw new BootstrapException("Invalid " + path.getFileName() + ": " + ex.getMessage(), ex);
+        }
+    }
+
+    /**
+     * Lets environment variables override the file, which is how containers are usually configured:
+     * {@code VECTOR_BIND_PORT=25570} sets {@code bind-port}, {@code VECTOR_DASHBOARD_HOST=0.0.0.0} sets
+     * {@code dashboard-host}. Values are read as JSON when they parse (numbers, booleans, arrays such as
+     * {@code VECTOR_BACKENDS='[{"host":"10.0.0.2","port":25577}]'}) and as plain text otherwise.
+     */
+    static void applyEnvironment(final Map<String, Object> root, final Map<String, String> env) {
+        for (final Map.Entry<String, String> entry : env.entrySet()) {
+            final String name = entry.getKey();
+            if (!name.startsWith("VECTOR_") || name.length() == "VECTOR_".length() || entry.getValue() == null) {
+                continue;
+            }
+            final String key = name.substring("VECTOR_".length()).toLowerCase(java.util.Locale.ROOT).replace('_', '-');
+            final String raw = entry.getValue().trim();
+            Object value;
+            try {
+                value = Json.parse(raw);
+            } catch (IllegalArgumentException notJson) {
+                value = entry.getValue();
+            }
+            root.put(key, value);
         }
     }
 
