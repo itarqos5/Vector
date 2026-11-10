@@ -332,9 +332,10 @@ public final class DashboardServer {
         final Map<String, String> query = query(ex);
         final long historySeq = longParam(query, "history");
         final long logSeq = longParam(query, "log");
+        final long activitySeq = longParam(query, "activity");
 
         final Map<String, Object> root = new LinkedHashMap<>(baseState());
-        appendIncremental(root, historySeq, logSeq);
+        appendIncremental(root, historySeq, logSeq, activitySeq);
         return root;
     }
 
@@ -453,7 +454,8 @@ public final class DashboardServer {
     }
 
     /** Per-client part: history points and log lines newer than the cursors the client sent. */
-    private void appendIncremental(final Map<String, Object> root, final long historySeq, final long logSeq) {
+    private void appendIncremental(final Map<String, Object> root, final long historySeq, final long logSeq,
+                                   final long activitySeq) {
         final List<Object> points = new ArrayList<>();
         long latestHistory = historySeq;
         for (final MetricsHistory.Point p : ctx.history.since(historySeq)) {
@@ -485,6 +487,21 @@ public final class DashboardServer {
         }
         root.put("logs", logs);
         root.put("logSeq", latestLog);
+
+        final List<Object> activity = new ArrayList<>();
+        long latestActivity = activitySeq;
+        for (final ActivityLog.Event e : ActivityLog.INSTANCE.since(activitySeq, activitySeq == 0 ? 100 : 300)) {
+            final Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put("seq", e.seq());
+            entry.put("t", e.timeMillis());
+            entry.put("type", e.type());
+            entry.put("subject", e.subject());
+            entry.put("detail", e.detail());
+            activity.add(entry);
+            latestActivity = e.seq();
+        }
+        root.put("activity", activity);
+        root.put("activitySeq", latestActivity);
     }
 
     /** Current settings as in config.json, with secrets replaced by whether they are set. */

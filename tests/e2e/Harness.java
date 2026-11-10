@@ -337,6 +337,7 @@ public class Harness {
             Thread.sleep(2500);
             String[] st2 = dash("GET", "/api/state?history=0&log=0", null, "Cookie", cookie);
             check("state returns backends, history and logs", st2[0].equals("200") && st2[1].contains("\"backends\":[{") && st2[1].contains("\"history\":[{") && st2[1].contains("\"logs\":[{"), st2[0] + st2[1].substring(0, Math.min(160, st2[1].length())));
+            check("state carries the activity feed", st2[1].contains("\"activity\":[") && st2[1].contains("\"activitySeq\":"), "activity");
             check("state lists connections list and totals", st2[1].contains("\"connectionsTotal\"") && st2[1].contains("\"whitelist\":{"), "fields");
             check("Bearer password works for scripts", dash("GET", "/api/state", null, "Authorization", "Bearer s3cret-pass")[0].equals("200"), "bearer");
             check("config view masks secrets", dash("GET", "/api/config", null, "Cookie", cookie)[1].contains("\"dashboard-password\":\"(set)\"") && !dash("GET", "/api/config", null, "Cookie", cookie)[1].contains("s3cret-pass"), "config");
