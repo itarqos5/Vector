@@ -24,7 +24,7 @@ public final class VectorRuntime {
     }
 
     public static void boot(final VectorConfig config) {
-        final ConfigHolder holder = new ConfigHolder(config);
+        final ConfigHolder holder = new ConfigHolder(Path.of("config.json"), config);
 
         final BanList banList = new BanList(Path.of("ban-list.txt"));
         banList.load();
@@ -32,6 +32,7 @@ public final class VectorRuntime {
         whitelist.load();
 
         final BackendPool pool = new BackendPool(holder);
+        holder.onReload(reloaded -> pool.apply(reloaded.backends()));
 
         final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2, runnable -> {
             final Thread thread = new Thread(runnable, "vector-scheduler");

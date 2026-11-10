@@ -1,5 +1,6 @@
 package gg.literal.console;
 
+import gg.literal.bootstrap.BootstrapException;
 import gg.literal.log.TerminalLogger;
 import gg.literal.runtime.Backend;
 import gg.literal.runtime.BackendPool;
@@ -91,6 +92,7 @@ public final class VectorConsole {
 
             case "backends" -> backends();
             case "stats" -> stats();
+            case "reload" -> reload();
 
             case "kick" -> {
                 if (parts.length < 2) { TerminalLogger.warn("Usage: kick <ip>"); return; }
@@ -267,6 +269,19 @@ public final class VectorConsole {
         }
     }
 
+    private void reload() {
+        try {
+            final List<String> restartRequired = ctx.reload();
+            TerminalLogger.info("Configuration reloaded (" + ctx.pool.all().size() + " backend(s), "
+                + ctx.pool.mode().id() + ", whitelist " + ctx.whitelist.size() + " entries).");
+            if (!restartRequired.isEmpty()) {
+                TerminalLogger.warn("These changes need a restart to take effect: " + String.join(", ", restartRequired));
+            }
+        } catch (BootstrapException ex) {
+            TerminalLogger.error("Reload failed, keeping the previous configuration: " + ex.getMessage());
+        }
+    }
+
     private void stats() {
         final Metrics m = Metrics.INSTANCE;
         final long uptime = (System.currentTimeMillis() - m.startedAtMillis) / 1000;
@@ -302,6 +317,7 @@ public final class VectorConsole {
         TerminalLogger.info("  list                          - list active connections (player, backend)");
         TerminalLogger.info("  backends                      - show backend health, load and latency");
         TerminalLogger.info("  stats                         - traffic, blocks and status ping counters");
+        TerminalLogger.info("  reload                        - reload config.json and whitelist.txt without restarting");
         TerminalLogger.info("  kick <ip>                     - disconnect a player by IP");
         TerminalLogger.info("  send <ip> <backend>           - disconnect and route the next login to a named backend");
         TerminalLogger.info("  send <ip> <host> <port>        - transfer the client to another server (1.20.5+)");

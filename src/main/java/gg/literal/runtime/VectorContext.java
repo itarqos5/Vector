@@ -1,5 +1,9 @@
 package gg.literal.runtime;
 
+import gg.literal.bootstrap.BootstrapException;
+
+import java.util.List;
+
 /** Everything the pipeline handlers and console share. */
 public final class VectorContext {
 
@@ -24,5 +28,17 @@ public final class VectorContext {
         this.whitelist = whitelist;
         this.pool = pool;
         this.limiter = limiter;
+    }
+
+    /**
+     * Reloads {@code config.json} and the whitelist file. The backend pool is updated through the config
+     * listener registered at boot.
+     *
+     * @return settings that changed but need a restart
+     */
+    public List<String> reload() throws BootstrapException {
+        final List<String> restartRequired = config.reload();
+        whitelist.load();
+        return restartRequired;
     }
 }
