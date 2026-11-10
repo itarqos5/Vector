@@ -377,6 +377,8 @@ public final class DashboardServer {
 
         final Map<String, Object> totals = new LinkedHashMap<>();
         totals.put("connectionsActive", ctx.registry.size());
+        totals.put("peakConnections", m.peakConnections());
+        totals.put("peakConnectionsAt", m.peakConnectionsAt());
         totals.put("connectionsTotal", m.connectionsTotal.sum());
         totals.put("bytesFromClients", m.bytesFromClients.sum());
         totals.put("bytesToClients", m.bytesToClients.sum());

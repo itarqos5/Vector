@@ -142,6 +142,7 @@ public final class ConnectionRegistry {
         channel.attr(ATTR_CONNECTED_AT).set(System.currentTimeMillis());
         channel.attr(ATTR_TRAFFIC).set(new Traffic());
         activeChannels.put(addressKey, channel);
+        Metrics.INSTANCE.observeConnections(activeChannels.size());
         keysByIp.compute(ipOfKey(addressKey), (ip, keys) -> {
             final Set<String> set = keys == null ? ConcurrentHashMap.newKeySet() : keys;
             set.add(addressKey);

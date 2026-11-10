@@ -329,7 +329,8 @@ public final class VectorConsole {
         final Metrics m = Metrics.INSTANCE;
         final long uptime = (System.currentTimeMillis() - m.startedAtMillis) / 1000;
         TerminalLogger.info("Uptime " + (uptime / 3600) + "h " + ((uptime / 60) % 60) + "m " + (uptime % 60) + "s"
-            + " | connections active=" + ctx.registry.size() + " total=" + m.connectionsTotal.sum());
+            + " | connections active=" + ctx.registry.size() + " peak=" + m.peakConnections()
+            + " total=" + m.connectionsTotal.sum());
         TerminalLogger.info("Traffic: from clients " + bytes(m.bytesFromClients.sum())
             + ", to clients " + bytes(m.bytesToClients.sum()));
         TerminalLogger.info("Blocked: ban=" + m.blockedBan.sum()

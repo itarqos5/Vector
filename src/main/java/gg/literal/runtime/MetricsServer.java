@@ -93,6 +93,7 @@ public final class MetricsServer {
         final Metrics m = Metrics.INSTANCE;
         final StringBuilder sb = new StringBuilder(2048);
         gauge(sb, "vector_uptime_seconds", "Seconds since Vector started", (System.currentTimeMillis() - m.startedAtMillis) / 1000);
+        gauge(sb, "vector_connections_peak", "Highest number of simultaneous client connections since start", m.peakConnections());
         gauge(sb, "vector_connections_active", "Client connections currently open", context.registry.size());
         counter(sb, "vector_connections_total", "Client connections accepted", m.connectionsTotal.sum());
         counter(sb, "vector_bytes_from_clients_total", "Bytes relayed client -> backend", m.bytesFromClients.sum());
