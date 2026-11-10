@@ -58,6 +58,39 @@ public final class DashboardServer {
     private record Result(boolean ok, String message) {
     }
 
+    /**
+     * Settings the dashboard may change at runtime, with the JSON type each expects. They are all reloadable and
+     * none is a secret or something that could lock the operator out (ports, hosts, passwords are excluded).
+     */
+    static final Map<String, String> EDITABLE = Map.ofEntries(
+        Map.entry("maintenance-enabled", "boolean"),
+        Map.entry("maintenance-message", "string"),
+        Map.entry("maintenance-motd", "string"),
+        Map.entry("whitelist-enabled", "boolean"),
+        Map.entry("whitelist-message", "string"),
+        Map.entry("full-message", "string"),
+        Map.entry("offline-motd", "string"),
+        Map.entry("protocol-message", "string"),
+        Map.entry("balance-mode", "string"),
+        Map.entry("status-cache-enabled", "boolean"),
+        Map.entry("status-sum-players", "boolean"),
+        Map.entry("log-chat", "boolean"),
+        Map.entry("max-connections-per-ip", "number"),
+        Map.entry("max-connection-rate-per-ip", "number"),
+        Map.entry("max-connections", "number"),
+        Map.entry("idle-timeout-seconds", "number"),
+        Map.entry("auto-ban-violations", "number"));
+
+    /** Whether {@code value} (as parsed from JSON) has the type {@code expected} ("boolean", "string", "number"). */
+    static boolean typeMatches(final String expected, final Object value) {
+        return switch (expected) {
+            case "boolean" -> value instanceof Boolean;
+            case "string" -> value instanceof String;
+            case "number" -> value instanceof Long;
+            default -> false;
+        };
+    }
+
     private final VectorContext ctx;
     private final SecureRandom random = new SecureRandom();
     private final Map<String, Asset> assets = new HashMap<>();
@@ -510,6 +543,13 @@ public final class DashboardServer {
 
     /** Current settings as in config.json, with secrets replaced by whether they are set. */
     private Map<String, Object> configView() {
+        final Map<String, Object> response = new LinkedHashMap<>();
+        response.put("settings", settingsView());
+        response.put("editable", new LinkedHashMap<>(new java.util.TreeMap<>(EDITABLE)));
+        return response;
+    }
+
+    private Map<String, Object> settingsView() {
         final VectorConfig c = ctx.config.get();
         final Map<String, Object> out = new LinkedHashMap<>();
         out.put("bind-host", c.bindHost());
@@ -676,6 +716,21 @@ public final class DashboardServer {
                 }
                 log(actor, "kickall " + name + " (" + count + ")");
                 return new Result(true, "Disconnected " + count + " connection(s)" + (name.isEmpty() ? "." : " on " + name + "."));
+            }
+            case "setting" -> {
+                final String key = str(body, "key");
+                final String type = EDITABLE.get(key);
+                if (type == null) return new Result(false, "\"" + key + "\" cannot be changed from the dashboard.");
+                final Object value = body.get("value");
+                if (!typeMatches(type, value)) return new Result(false, key + " expects a " + type + " value.");
+                try {
+                    final List<String> restart = ctx.config.update(Map.of(key, value));
+                    log(actor, "set " + key + " = " + value);
+                    return new Result(true, "Saved " + key + " = " + value + "."
+                        + (restart.isEmpty() ? "" : " Restart Vector to apply: " + String.join(", ", restart) + "."));
+                } catch (BootstrapException ex) {
+                    return new Result(false, ex.getMessage());
+                }
             }
             case "reload" -> {
                 try {

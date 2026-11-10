@@ -745,7 +745,7 @@
       if (!res.ok) throw new Error('bad response');
       const list = $('configList');
       list.replaceChildren();
-      for (const [key, value] of Object.entries(res.body)) {
+      for (const [key, value] of Object.entries(res.body.settings)) {
         let text;
         if (key === 'backends') {
           text = value.map((b) => `${b.name}  ${b.host}:${b.port}  weight ${b.weight}`).join('\n');
