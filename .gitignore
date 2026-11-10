@@ -48,5 +48,6 @@ whitelist.txt
 tests/ban-list.txt
 tests/whitelist.txt
 
-# GitHub
-.github/
+# GitHub (workflows are tracked, everything else here is local)
+.github/*
+!.github/workflows/
