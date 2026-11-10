@@ -133,6 +133,25 @@ class BackendPoolTest {
     }
 
     @Test
+    void drainingBackendsKeepSessionsButGetNoNewPlayers() {
+        final BackendPool p = pool(BalanceMode.ROUND_ROBIN, 2,
+            TestConfigs.target("a", 1, 1), TestConfigs.target("b", 2, 1));
+        final Backend a = p.findByName("a");
+        p.acquire(a);
+        a.setDraining(true);
+
+        assertTrue(a.healthy(), "draining is not the same as down");
+        assertFalse(a.available());
+        assertEquals(1, p.availableCount());
+        assertEquals(2, p.healthyCount());
+        assertEquals(1, a.activeConnections(), "existing sessions are untouched");
+        assertEquals(Map.of("b", 6), pick(p, 6, "1.1.1.1"));
+
+        a.setDraining(false);
+        assertEquals(2, p.availableCount());
+    }
+
+    @Test
     void markInitialAppliesImmediately() {
         final BackendPool p = pool(BalanceMode.ROUND_ROBIN, 5, TestConfigs.target("a", 1, 1));
         final Backend a = p.findByName("a");

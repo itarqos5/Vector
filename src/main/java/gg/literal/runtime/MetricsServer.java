@@ -40,7 +40,7 @@ public final class MetricsServer {
         server.createContext("/metrics", exchange -> respond(exchange, "text/plain; version=0.0.4; charset=utf-8", prometheus(), 200, true));
         server.createContext("/stats", exchange -> respond(exchange, "application/json; charset=utf-8", Json.write(stats()), 200, true));
         server.createContext("/health", exchange -> {
-            final boolean up = context.pool.healthyCount() > 0;
+            final boolean up = context.pool.availableCount() > 0;
             respond(exchange, "text/plain; charset=utf-8", up ? "ok\n" : "no healthy backend\n", up ? 200 : 503, false);
         });
         server.setExecutor(Executors.newFixedThreadPool(2, r -> {

@@ -12,6 +12,7 @@ public final class Backend {
     private volatile int weight;
 
     private volatile boolean healthy = true;
+    private volatile boolean draining;
     private volatile int consecutiveFailures;
     private volatile long latencyMs = -1L;
     private volatile long lastCheckMillis;
@@ -52,6 +53,20 @@ public final class Backend {
 
     public boolean healthy() {
         return healthy;
+    }
+
+    /** A draining backend keeps its existing sessions but is skipped for new players. */
+    public boolean draining() {
+        return draining;
+    }
+
+    public void setDraining(final boolean value) {
+        this.draining = value;
+    }
+
+    /** Healthy and not draining: eligible for new players. */
+    public boolean available() {
+        return healthy && !draining;
     }
 
     public int activeConnections() {

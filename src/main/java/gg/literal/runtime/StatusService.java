@@ -65,7 +65,7 @@ public final class StatusService {
             return Decision.MAINTENANCE;
         }
         final VectorConfig.Status settings = config.get().status();
-        if (pool.healthyCount() == 0 && !settings.offlineMotd().isEmpty()) {
+        if (pool.availableCount() == 0 && !settings.offlineMotd().isEmpty()) {
             return Decision.OFFLINE;
         }
         if (settings.cacheEnabled() && composedPacket != null) {

@@ -406,6 +406,7 @@ public final class DashboardServer {
             entry.put("address", b.address());
             entry.put("weight", b.weight());
             entry.put("healthy", b.healthy());
+            entry.put("draining", b.draining());
             entry.put("active", b.activeConnections());
             entry.put("total", b.totalConnections());
             entry.put("failures", b.connectFailures());

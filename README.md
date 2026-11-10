@@ -126,6 +126,7 @@ Notes:
 | `list` | Active connections with player name and backend. |
 | `backends` | Backend health, weight, open/total connections, failures and probe latency. |
 | `stats` | Traffic, blocked connections by reason, status ping counters. |
+| `drain <backend>` / `undrain <backend>` | Stop or resume sending new players to a backend; existing sessions continue. Useful before restarting a server. |
 | `reload` | Reload `config.json` and `whitelist.txt`. An invalid file is rejected and the old config stays active. |
 | `kick <ip>` | Disconnect a client. |
 | `send <ip> <backend>` | Disconnect the player and route their next login to the named backend. |

@@ -83,6 +83,7 @@ public final class VectorConsole {
             case "banlist" -> banlist();
             case "whitelist" -> whitelist(parts);
             case "backends" -> backends();
+            case "drain", "undrain" -> drain(command.equals("drain"), parts);
             case "reload" -> reload();
             case "stats" -> stats();
             case "maintenance" -> maintenance(parts);
@@ -253,9 +254,25 @@ public final class VectorConsole {
         TerminalLogger.info("Backends (" + all.size() + ", " + ctx.pool.mode().id() + "):");
         for (final Backend b : all) {
             TerminalLogger.info(String.format("  %-14s %-24s %-5s weight=%-3d conns=%-4d total=%-6d fails=%-4d latency=%s",
-                b.name(), b.address(), b.healthy() ? "UP" : "DOWN", b.weight(), b.activeConnections(),
+                b.name(), b.address(), b.healthy() ? (b.draining() ? "DRAIN" : "UP") : "DOWN", b.weight(), b.activeConnections(),
                 b.totalConnections(), b.connectFailures(), b.latencyMs() >= 0 ? b.latencyMs() + "ms" : "-"));
         }
+    }
+
+    private void drain(final boolean enable, final String[] parts) {
+        if (parts.length < 2) {
+            TerminalLogger.warn("Usage: " + (enable ? "drain" : "undrain") + " <backend>");
+            return;
+        }
+        final Backend backend = ctx.pool.findByName(parts[1]);
+        if (backend == null) {
+            TerminalLogger.warn("Unknown backend \"" + parts[1] + "\". Use 'backends' to list them.");
+            return;
+        }
+        backend.setDraining(enable);
+        TerminalLogger.info(BackendPool.describe(backend) + (enable
+            ? " is draining: no new players, " + backend.activeConnections() + " existing session(s) continue."
+            : " accepts new players again."));
     }
 
     private void maintenance(final String[] parts) {
@@ -332,6 +349,7 @@ public final class VectorConsole {
         TerminalLogger.info("Vector commands:");
         TerminalLogger.info("  list                          - list active connections (player, backend)");
         TerminalLogger.info("  backends                      - show backend health, load and latency");
+        TerminalLogger.info("  drain <backend> | undrain <backend> - stop or resume sending new players to a backend");
         TerminalLogger.info("  stats                         - traffic, blocks and status ping counters");
         TerminalLogger.info("  version                       - show the Vector and Java versions");
         TerminalLogger.info("  maintenance [on|off]          - refuse logins except whitelisted players");

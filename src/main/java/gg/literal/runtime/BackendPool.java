@@ -68,6 +68,17 @@ public final class BackendPool {
         return count;
     }
 
+    /** Backends that are up and accepting new players (healthy and not draining). */
+    public int availableCount() {
+        int count = 0;
+        for (final Backend backend : backends) {
+            if (backend.available()) {
+                count++;
+            }
+        }
+        return count;
+    }
+
     public Backend find(final String host, final int port) {
         for (final Backend backend : backends) {
             if (backend.port() == port && backend.host().equalsIgnoreCase(host)) {
@@ -116,7 +127,7 @@ public final class BackendPool {
     }
 
     private static boolean usable(final Backend backend, final Set<Backend> excluded) {
-        return backend.healthy() && (excluded.isEmpty() || !excluded.contains(backend));
+        return backend.available() && (excluded.isEmpty() || !excluded.contains(backend));
     }
 
     /** The {@code index}-th usable backend in configuration order (no intermediate list is allocated). */
