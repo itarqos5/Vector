@@ -32,6 +32,13 @@ public final class BackendRelayHandler extends ChannelInboundHandlerAdapter {
         ReferenceCountUtil.release(msg);
     }
 
+    /** Backpressure in the other direction: a slow backend pauses reading from the client. */
+    @Override
+    public void channelWritabilityChanged(final ChannelHandlerContext ctx) {
+        inboundChannel.config().setAutoRead(ctx.channel().isWritable());
+        ctx.fireChannelWritabilityChanged();
+    }
+
     @Override
     public void channelReadComplete(final ChannelHandlerContext ctx) {
         if (flushNeeded) {

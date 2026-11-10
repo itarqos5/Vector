@@ -431,6 +431,19 @@ public final class EuFrontendHandler extends ChannelInboundHandlerAdapter {
         });
     }
 
+    /**
+     * Backpressure: when the client socket cannot keep up, stop reading from the backend until it drains,
+     * so a slow client cannot make Vector buffer an unbounded amount of backend output.
+     */
+    @Override
+    public void channelWritabilityChanged(final ChannelHandlerContext ctx) {
+        final Channel out = outboundChannel;
+        if (backendReady && out != null) {
+            out.config().setAutoRead(ctx.channel().isWritable());
+        }
+        ctx.fireChannelWritabilityChanged();
+    }
+
     @Override
     public void channelReadComplete(final ChannelHandlerContext ctx) {
         flushUpstream();
