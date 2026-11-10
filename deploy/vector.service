@@ -1,0 +1,33 @@
+# Install as /etc/systemd/system/vector.service, then:
+#   sudo useradd --system --home /opt/vector --shell /usr/sbin/nologin vector
+#   sudo install -d -o vector -g vector /opt/vector
+#   sudo cp target/vector-*.jar /opt/vector/vector.jar
+#   echo "eula=true" | sudo -u vector tee /opt/vector/eula.txt
+#   sudo systemctl daemon-reload && sudo systemctl enable --now vector
+[Unit]
+Description=Vector Minecraft proxy
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=vector
+Group=vector
+WorkingDirectory=/opt/vector
+ExecStart=/usr/bin/java --enable-native-access=ALL-UNNAMED -XX:+UseG1GC -XX:MaxGCPauseMillis=30 -Xms256m -Xmx512m -jar /opt/vector/vector.jar --attached-console
+# Secrets and overrides (VECTOR_DASHBOARD_PASSWORD=...) can live in this file.
+EnvironmentFile=-/etc/vector.env
+Restart=on-failure
+RestartSec=5
+# Players connect from many sockets.
+LimitNOFILE=65536
+
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/vector
+
+[Install]
+WantedBy=multi-user.target
