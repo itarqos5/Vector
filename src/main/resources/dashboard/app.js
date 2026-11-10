@@ -632,7 +632,10 @@
     }
   }
 
-  $('playerFilter').addEventListener('input', () => { if (state.data) renderPlayers(state.data, true); });
+  $('playerFilter').addEventListener('input', () => {
+    prefs.set('playerFilter', $('playerFilter').value);
+    if (state.data) renderPlayers(state.data, true);
+  });
 
   // ---- ban dialog
 
@@ -767,8 +770,8 @@
     followLogs();
   }
 
-  $('logLevel').addEventListener('change', renderLogsFull);
-  $('logSearch').addEventListener('input', renderLogsFull);
+  $('logLevel').addEventListener('change', () => { prefs.set('logLevel', $('logLevel').value); renderLogsFull(); });
+  $('logSearch').addEventListener('input', () => { prefs.set('logSearch', $('logSearch').value); renderLogsFull(); });
   $('logBox').addEventListener('scroll', () => {
     const box = $('logBox');
     $('logFollow').checked = box.scrollHeight - box.scrollTop - box.clientHeight < 24;
@@ -808,6 +811,10 @@
   // ------------------------------------------------------------------ start
 
   applyTheme(THEMES.includes(prefs.get('theme', 'auto')) ? prefs.get('theme', 'auto') : 'auto');
+  // Restore the filters from the last visit.
+  $('playerFilter').value = prefs.get('playerFilter', '');
+  $('logSearch').value = prefs.get('logSearch', '');
+  if (['ALL', 'WARN', 'ERROR'].includes(prefs.get('logLevel', 'ALL'))) $('logLevel').value = prefs.get('logLevel', 'ALL');
   const initial = (location.hash || '#overview').slice(1);
   if (['overview', 'players', 'backends', 'access', 'logs', 'config'].includes(initial)) {
     selectTab(initial);
