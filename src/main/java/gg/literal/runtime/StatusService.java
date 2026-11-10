@@ -30,6 +30,7 @@ public final class StatusService {
     private record Snapshot(Map<String, Object> json, long takenAt) {
     }
 
+    private final SyntheticStatus offline;
     private final BackendPool pool;
     private final ConfigHolder config;
     private final ScheduledExecutorService scheduler;
@@ -42,6 +43,7 @@ public final class StatusService {
         this.pool = pool;
         this.config = config;
         this.scheduler = scheduler;
+        this.offline = new SyntheticStatus("Offline", () -> config.get().status().offlineMotd());
     }
 
     public void start() {
@@ -77,45 +79,7 @@ public final class StatusService {
             }
         }
         Metrics.INSTANCE.statusOffline.increment();
-        return alloc.buffer().writeBytes(offlinePacket(clientProtocol));
-    }
-
-    /** Serialised offline responses per client protocol, rebuilt when the MOTD changes. */
-    private final ConcurrentHashMap<Integer, byte[]> offlineCache = new ConcurrentHashMap<>();
-    private volatile String offlineCacheMotd = "";
-    private static final int OFFLINE_CACHE_LIMIT = 64;
-
-    private byte[] offlinePacket(final int clientProtocol) {
-        final String motd = config.get().status().offlineMotd();
-        if (!motd.equals(offlineCacheMotd)) {
-            offlineCache.clear();
-            offlineCacheMotd = motd;
-        }
-        final byte[] cached = offlineCache.get(clientProtocol);
-        if (cached != null) {
-            return cached;
-        }
-        final byte[] built = buildOfflinePacket(clientProtocol);
-        if (offlineCache.size() < OFFLINE_CACHE_LIMIT) { // protocol numbers come from clients, so bound the cache
-            offlineCache.put(clientProtocol, built);
-        }
-        return built;
-    }
-
-    private byte[] buildOfflinePacket(final int clientProtocol) {
-        final Map<String, Object> version = new LinkedHashMap<>();
-        version.put("name", "Offline");
-        version.put("protocol", (long) clientProtocol);
-        final Map<String, Object> players = new LinkedHashMap<>();
-        players.put("max", 0L);
-        players.put("online", 0L);
-        final Map<String, Object> description = new LinkedHashMap<>();
-        description.put("text", config.get().status().offlineMotd());
-        final Map<String, Object> root = new LinkedHashMap<>();
-        root.put("version", version);
-        root.put("players", players);
-        root.put("description", description);
-        return McProtocol.stringPacketBytes(McProtocol.PACKET_STATUS_RESPONSE, Json.write(root));
+        return alloc.buffer().writeBytes(offline.packet(clientProtocol));
     }
 
     // ------------------------------------------------------------------ refresh
