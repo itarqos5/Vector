@@ -170,6 +170,16 @@ class VectorConfigLoaderTest {
     }
 
     @Test
+    void validatesWebhookSettings() throws Exception {
+        final VectorConfig cfg = load("{\"webhook-url\": \" https://discord.com/api/webhooks/1/x \", \"webhook-events\": [\"Backend-Down\", \"admin\"]}");
+        assertEquals("https://discord.com/api/webhooks/1/x", cfg.policy().webhookUrl());
+        assertEquals(java.util.List.of("backend-down", "admin"), cfg.policy().webhookEvents());
+        assertTrue(load("{}").policy().webhookUrl().isEmpty());
+        assertTrue(failure("{\"webhook-url\": \"ftp://x\"}").contains("webhook-url"));
+        assertTrue(failure("{\"webhook-events\": [\"explode\"]}").contains("unknown webhook event"));
+    }
+
+    @Test
     void reportsUnknownBalanceModes() throws Exception {
         assertTrue(failure("{\"balance-mode\": \"fastest\"}").contains("balance-mode"));
     }

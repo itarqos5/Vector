@@ -183,7 +183,9 @@ public final class VectorConfigLoader {
             intValue(root, "auto-ban-window-seconds", dp.autoBanWindowSeconds(), 1, 86_400),
             intValue(root, "auto-ban-minutes", dp.autoBanMinutes(), 1, 525_600),
             bool(root, "log-to-file", dp.logToFile()),
-            intValue(root, "log-retention-days", dp.logRetentionDays(), 0, 36_500)
+            intValue(root, "log-retention-days", dp.logRetentionDays(), 0, 36_500),
+            webhookUrl(root, dp.webhookUrl()),
+            webhookEvents(root, dp.webhookEvents())
         );
         if (policy.maxProtocol() != 0 && policy.minProtocol() > policy.maxProtocol()) {
             throw new IllegalArgumentException("min-protocol (" + policy.minProtocol()
@@ -339,6 +341,28 @@ public final class VectorConfigLoader {
         return List.copyOf(out);
     }
 
+    private static String webhookUrl(final Map<String, Object> root, final String fallback) {
+        final String url = string(root, "webhook-url", fallback).trim();
+        if (!url.isEmpty() && !url.startsWith("https://") && !url.startsWith("http://")) {
+            throw new IllegalArgumentException("webhook-url must start with http:// or https://");
+        }
+        return url;
+    }
+
+    private static final Set<String> WEBHOOK_EVENTS =
+        Set.of("join", "leave", "refused", "backend-up", "backend-down", "auto-ban", "admin");
+
+    private static List<String> webhookEvents(final Map<String, Object> root, final List<String> fallback) {
+        final List<String> events = stringList(root, "webhook-events", fallback);
+        for (final String event : events) {
+            if (!WEBHOOK_EVENTS.contains(event.toLowerCase())) {
+                throw new IllegalArgumentException("unknown webhook event \"" + event + "\" (use "
+                    + String.join(", ", new java.util.TreeSet<>(WEBHOOK_EVENTS)) + ")");
+            }
+        }
+        return events.stream().map(String::toLowerCase).toList();
+    }
+
     private static boolean bool(final Map<String, Object> map, final String key, final boolean fallback) {
         final Object value = map.get(key);
         if (value == null) {
@@ -429,6 +453,8 @@ public final class VectorConfigLoader {
         line(sb, "auto-ban-minutes", d.policy().autoBanMinutes());
         line(sb, "log-to-file", d.policy().logToFile());
         line(sb, "log-retention-days", d.policy().logRetentionDays());
+        line(sb, "webhook-url", Json.quote(d.policy().webhookUrl()));
+        line(sb, "webhook-events", Json.write(d.policy().webhookEvents()));
         line(sb, "dashboard-enabled", d.dashboard().enabled());
         line(sb, "dashboard-host", Json.quote(d.dashboard().host()));
         line(sb, "dashboard-port", d.dashboard().port());

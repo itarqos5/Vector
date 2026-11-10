@@ -54,6 +54,7 @@ public final class VectorRuntime {
         statusService.start();
         healthChecker.start();
         history.start(scheduler);
+        new WebhookNotifier(holder).start();
         scheduler.scheduleWithFixedDelay(() -> {
             limiter.sweep(holder.get().limits().connectionRateWindowMs());
             autoBan.sweep();

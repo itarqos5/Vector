@@ -118,6 +118,8 @@ Older configs that only set `backend-host` / `backend-port` keep working as a si
 | `auto-ban-violations` | `0` | yes | Ban an IP automatically after this many violations (connection-rate hits, packet floods, refused host names) inside `auto-ban-window-seconds` (default `60`) for `auto-ban-minutes` (default `30`). `0` = off. |
 | `log-to-file` | `true` | no | Also write the log to `logs/latest.log`; each day is gzipped to `logs/yyyy-MM-dd.log.gz`. |
 | `log-retention-days` | `14` | no | Delete rotated logs older than this many days (`0` keeps everything). |
+| `webhook-url` | empty | no | Discord- or Slack-compatible incoming webhook URL. When set, selected events are posted (at most 5 per 10 seconds). |
+| `webhook-events` | `["backend-down","backend-up","auto-ban"]` | no | Events to post: `join`, `leave`, `refused`, `backend-up`, `backend-down`, `auto-ban`, `admin`. |
 | `dashboard-enabled` | `true` | no | Start the web dashboard. |
 | `dashboard-host` / `dashboard-port` | `127.0.0.1` / `3000` | no | Where the dashboard listens. Use `0.0.0.0` to reach it from other machines. |
 | `dashboard-password` | empty | no | Password for the dashboard. See [Dashboard](#dashboard). |

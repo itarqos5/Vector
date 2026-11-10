@@ -571,6 +571,8 @@ public final class DashboardServer {
         out.put("auto-ban-violations", c.policy().autoBanViolations());
         out.put("auto-ban-window-seconds", c.policy().autoBanWindowSeconds());
         out.put("auto-ban-minutes", c.policy().autoBanMinutes());
+        out.put("webhook-url", c.policy().webhookUrl().isEmpty() ? "(not set)" : "(set)");
+        out.put("webhook-events", String.join(", ", c.policy().webhookEvents()));
         out.put("log-to-file", c.policy().logToFile());
         out.put("log-retention-days", c.policy().logRetentionDays());
         out.put("allowed-hosts", c.policy().allowedHosts().isEmpty() ? "(any)" : String.join(", ", c.policy().allowedHosts()));

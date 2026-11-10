@@ -182,6 +182,8 @@ public record VectorConfig(
      * @param autoBanMinutes how long an automatic ban lasts
      * @param logToFile also write the log to logs/latest.log (rotated daily, gzipped)
      * @param logRetentionDays delete rotated logs older than this many days (0 = keep everything)
+     * @param webhookUrl Discord/Slack-compatible incoming webhook that receives selected events (empty = off)
+     * @param webhookEvents which events to post: join, leave, refused, backend-up, backend-down, auto-ban, admin
      */
     public record Policy(
         boolean logChat,
@@ -200,7 +202,9 @@ public record VectorConfig(
         int autoBanWindowSeconds,
         int autoBanMinutes,
         boolean logToFile,
-        int logRetentionDays
+        int logRetentionDays,
+        String webhookUrl,
+        List<String> webhookEvents
     ) {
     }
 
@@ -233,7 +237,7 @@ public record VectorConfig(
             new Dashboard(true, "127.0.0.1", 3000, ""),
             new Policy(true, 120, 5000, 0, false, "\u00a7eThe server is under maintenance. Please try again later.", "\u00a76Under maintenance",
                 "\u00a7cAll servers are full right now. Please try again shortly.",
-                0, 0, "\u00a7cYour Minecraft version is not supported on this server.", List.of(), 0, 60, 30, true, 14)
+                0, 0, "\u00a7cYour Minecraft version is not supported on this server.", List.of(), 0, 60, 30, true, 14, "", List.of("backend-down", "backend-up", "auto-ban"))
         );
     }
 
