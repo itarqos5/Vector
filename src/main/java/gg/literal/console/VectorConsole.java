@@ -5,6 +5,7 @@ import gg.literal.log.TerminalLogger;
 import gg.literal.runtime.Backend;
 import gg.literal.runtime.BackendPool;
 import gg.literal.runtime.BanList;
+import gg.literal.runtime.Durations;
 import gg.literal.runtime.Metrics;
 import gg.literal.runtime.VectorContext;
 
@@ -14,16 +15,12 @@ import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 public final class VectorConsole {
 
     private static final String ANSI_RED   = "\u001B[31m";
     private static final String ANSI_GREEN = "\u001B[32m";
     private static final String ANSI_RESET = "\u001B[0m";
-
-    private static final Pattern DURATION = Pattern.compile("(\\d+)([smhdw])");
 
     private final VectorContext ctx;
 
@@ -166,7 +163,7 @@ public final class VectorConsole {
         long durationMillis = 0L;
         int reasonStart = 2;
         if (parts.length > 2) {
-            final long parsed = parseDuration(parts[2]);
+            final long parsed = Durations.parseMillis(parts[2]);
             if (parsed > 0) {
                 durationMillis = parsed;
                 reasonStart = 3;
@@ -210,25 +207,6 @@ public final class VectorConsole {
             : " (until " + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date(entry.expiresAtMillis())));
         if (!entry.reason().isEmpty()) sb.append(": ").append(entry.reason());
         return sb.append(')').toString();
-    }
-
-    /** Parses {@code 30s}, {@code 15m}, {@code 12h}, {@code 7d}, {@code 2w}; returns -1 if {@code token} isn't a duration. */
-    private static long parseDuration(final String token) {
-        final Matcher m = DURATION.matcher(token.toLowerCase());
-        if (!m.matches()) return -1L;
-        final long amount = Long.parseLong(m.group(1));
-        final long unit = switch (m.group(2).charAt(0)) {
-            case 's' -> 1_000L;
-            case 'm' -> 60_000L;
-            case 'h' -> 3_600_000L;
-            case 'd' -> 86_400_000L;
-            default -> 604_800_000L;
-        };
-        try {
-            return Math.multiplyExact(amount, unit);
-        } catch (ArithmeticException ex) {
-            return -1L;
-        }
     }
 
     // ------------------------------------------------------------------ whitelist
