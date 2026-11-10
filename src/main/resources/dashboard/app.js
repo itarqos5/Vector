@@ -118,6 +118,34 @@
     }
   }
 
+  // ------------------------------------------------------------------ preferences
+
+  /** localStorage can throw (private windows, blocked storage), so every access goes through these. */
+  const prefs = {
+    get(key, fallback) {
+      try { const v = localStorage.getItem(`vector.${key}`); return v === null ? fallback : v; } catch (e) { return fallback; }
+    },
+    set(key, value) {
+      try { localStorage.setItem(`vector.${key}`, String(value)); } catch (e) { /* not persisted, still works */ }
+    },
+  };
+
+  const THEMES = ['auto', 'light', 'dark'];
+
+  function applyTheme(theme) {
+    if (theme === 'auto') document.documentElement.removeAttribute('data-theme');
+    else document.documentElement.setAttribute('data-theme', theme);
+    $('themeBtn').textContent = `Theme: ${theme}`;
+    if (state.data && state.tab === 'overview') renderOverview(state.data); // charts read colours when drawn
+  }
+
+  $('themeBtn').addEventListener('click', () => {
+    const current = prefs.get('theme', 'auto');
+    const next = THEMES[(THEMES.indexOf(current) + 1) % THEMES.length];
+    prefs.set('theme', next);
+    applyTheme(next);
+  });
+
   // ------------------------------------------------------------------ session
 
   function showLogin() {
@@ -779,6 +807,7 @@
 
   // ------------------------------------------------------------------ start
 
+  applyTheme(THEMES.includes(prefs.get('theme', 'auto')) ? prefs.get('theme', 'auto') : 'auto');
   const initial = (location.hash || '#overview').slice(1);
   if (['overview', 'players', 'backends', 'access', 'logs', 'config'].includes(initial)) {
     selectTab(initial);
