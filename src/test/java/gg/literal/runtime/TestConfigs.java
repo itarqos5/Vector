@@ -28,7 +28,7 @@ final class TestConfigs {
         final VectorConfig.Policy policy = new VectorConfig.Policy(p.logChat(), p.idleTimeoutSeconds(),
             p.handshakeTimeoutMs(), p.maxConnections(), p.maintenance(), p.maintenanceMessage(), p.maintenanceMotd(),
             p.fullMessage(), p.minProtocol(), p.maxProtocol(), p.protocolMessage(), p.allowedHosts(),
-            violations, p.autoBanWindowSeconds(), p.autoBanMinutes());
+            violations, p.autoBanWindowSeconds(), p.autoBanMinutes(), p.logToFile(), p.logRetentionDays());
         return new VectorConfig(d.bindHost(), d.bindPort(), d.bossThreads(), d.workerThreads(),
             d.maxBytesPerSecond(), d.maxPacketsPerSecond(), d.connectTimeoutMs(), d.proxyProtocol(), d.backends(),
             d.limits(), d.status(), d.access(), d.metrics(), d.dashboard(), policy);

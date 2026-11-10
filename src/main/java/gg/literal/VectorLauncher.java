@@ -43,6 +43,10 @@ public final class VectorLauncher {
             TerminalLogger.info("Phase 2/3: Configuration validation");
             final VectorConfig config = VectorConfigLoader.loadOrCreate(Path.of("config.json"));
 
+            if (config.policy().logToFile()) {
+                TerminalLogger.enableFileLogging(Path.of("logs"), config.policy().logRetentionDays());
+            }
+
             TerminalLogger.info("Phase 3/3: Hardware validation");
             HardwareValidator.validate(config);
 

@@ -181,7 +181,9 @@ public final class VectorConfigLoader {
             stringList(root, "allowed-hosts", dp.allowedHosts()),
             intValue(root, "auto-ban-violations", dp.autoBanViolations(), 0, 1_000_000),
             intValue(root, "auto-ban-window-seconds", dp.autoBanWindowSeconds(), 1, 86_400),
-            intValue(root, "auto-ban-minutes", dp.autoBanMinutes(), 1, 525_600)
+            intValue(root, "auto-ban-minutes", dp.autoBanMinutes(), 1, 525_600),
+            bool(root, "log-to-file", dp.logToFile()),
+            intValue(root, "log-retention-days", dp.logRetentionDays(), 0, 36_500)
         );
         if (policy.maxProtocol() != 0 && policy.minProtocol() > policy.maxProtocol()) {
             throw new IllegalArgumentException("min-protocol (" + policy.minProtocol()
@@ -425,6 +427,8 @@ public final class VectorConfigLoader {
         line(sb, "auto-ban-violations", d.policy().autoBanViolations());
         line(sb, "auto-ban-window-seconds", d.policy().autoBanWindowSeconds());
         line(sb, "auto-ban-minutes", d.policy().autoBanMinutes());
+        line(sb, "log-to-file", d.policy().logToFile());
+        line(sb, "log-retention-days", d.policy().logRetentionDays());
         line(sb, "dashboard-enabled", d.dashboard().enabled());
         line(sb, "dashboard-host", Json.quote(d.dashboard().host()));
         line(sb, "dashboard-port", d.dashboard().port());

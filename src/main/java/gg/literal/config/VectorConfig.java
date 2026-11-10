@@ -180,6 +180,8 @@ public record VectorConfig(
      * @param autoBanViolations ban an IP after this many violations inside the window (0 = never)
      * @param autoBanWindowSeconds length of the violation window
      * @param autoBanMinutes how long an automatic ban lasts
+     * @param logToFile also write the log to logs/latest.log (rotated daily, gzipped)
+     * @param logRetentionDays delete rotated logs older than this many days (0 = keep everything)
      */
     public record Policy(
         boolean logChat,
@@ -196,7 +198,9 @@ public record VectorConfig(
         List<String> allowedHosts,
         int autoBanViolations,
         int autoBanWindowSeconds,
-        int autoBanMinutes
+        int autoBanMinutes,
+        boolean logToFile,
+        int logRetentionDays
     ) {
     }
 
@@ -229,7 +233,7 @@ public record VectorConfig(
             new Dashboard(true, "127.0.0.1", 3000, ""),
             new Policy(true, 120, 5000, 0, false, "\u00a7eThe server is under maintenance. Please try again later.", "\u00a76Under maintenance",
                 "\u00a7cAll servers are full right now. Please try again shortly.",
-                0, 0, "\u00a7cYour Minecraft version is not supported on this server.", List.of(), 0, 60, 30)
+                0, 0, "\u00a7cYour Minecraft version is not supported on this server.", List.of(), 0, 60, 30, true, 14)
         );
     }
 

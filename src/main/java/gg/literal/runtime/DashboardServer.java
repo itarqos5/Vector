@@ -571,6 +571,8 @@ public final class DashboardServer {
         out.put("auto-ban-violations", c.policy().autoBanViolations());
         out.put("auto-ban-window-seconds", c.policy().autoBanWindowSeconds());
         out.put("auto-ban-minutes", c.policy().autoBanMinutes());
+        out.put("log-to-file", c.policy().logToFile());
+        out.put("log-retention-days", c.policy().logRetentionDays());
         out.put("allowed-hosts", c.policy().allowedHosts().isEmpty() ? "(any)" : String.join(", ", c.policy().allowedHosts()));
         out.put("handshake-timeout-ms", c.policy().handshakeTimeoutMs());
         out.put("dashboard-enabled", c.dashboard().enabled());

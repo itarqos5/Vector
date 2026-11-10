@@ -29,7 +29,21 @@ public final class TerminalLogger {
     private static final Deque<LogEntry> RECENT = new ArrayDeque<>(RECENT_CAPACITY);
     private static long nextSeq = 1;
 
+    private static volatile LogFileWriter fileWriter;
+
     private TerminalLogger() {
+    }
+
+    /** Starts mirroring every log line (without colours) into {@code dir/latest.log}, rotated daily. */
+    public static void enableFileLogging(final java.nio.file.Path dir, final int keepDays) {
+        fileWriter = new LogFileWriter(dir, keepDays);
+    }
+
+    private static void toFile(final String timestamp, final String level, final String message) {
+        final LogFileWriter writer = fileWriter;
+        if (writer != null) {
+            writer.write("[" + timestamp + "] [" + level + "] " + message);
+        }
     }
 
     /**
@@ -85,6 +99,7 @@ public final class TerminalLogger {
         final String timestamp = LocalTime.now().format(FORMATTER);
         final String level = colorize("[FATAL]", BRIGHT_RED_BG + FLASH);
         remember("FATAL", message);
+        toFile(timestamp, "FATAL", message);
         synchronized (LOCK) {
             System.err.println("[" + timestamp + "] " + level + " " + message);
         }
@@ -96,6 +111,7 @@ public final class TerminalLogger {
         final String colorizedLevel = colorize("[" + level + "]", levelColor);
         final String colorizedMessage = colorize(message, messageColor);
         remember(level, message);
+        toFile(timestamp, level, message);
         synchronized (LOCK) {
             System.out.println("[" + timestamp + "] " + colorizedLevel + " " + colorizedMessage);
         }
