@@ -120,8 +120,10 @@ public record VectorConfig(
      *                stop inspecting packets once a player is in game, which saves CPU on busy offline-mode backends
      * @param idleTimeoutSeconds close a connection that has sent nothing for this long (0 disables); real
      *                           clients send keep-alives every few seconds, so silence means a dead peer
+     * @param handshakeTimeoutMs close a connection that sends no bytes at all within this time (0 disables),
+     *                           which defeats sockets opened only to tie up resources
      */
-    public record Policy(boolean logChat, int idleTimeoutSeconds) {
+    public record Policy(boolean logChat, int idleTimeoutSeconds, int handshakeTimeoutMs) {
     }
 
     public static VectorConfig defaults() {
@@ -149,7 +151,7 @@ public record VectorConfig(
             new Access(false, "§cYou are not whitelisted on this server."),
             new Metrics(false, "127.0.0.1", 9100, ""),
             new Dashboard(true, "127.0.0.1", 3000, ""),
-            new Policy(true, 120)
+            new Policy(true, 120, 5000)
         );
     }
 

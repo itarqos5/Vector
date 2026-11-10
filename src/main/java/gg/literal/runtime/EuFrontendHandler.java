@@ -69,6 +69,7 @@ public final class EuFrontendHandler extends ChannelInboundHandlerAdapter {
     private final ArrayDeque<Object> pending = new ArrayDeque<>();
     private int pendingBytes;
     private ScheduledFuture<?> decideTimeout;
+    private ScheduledFuture<?> handshakeTimer;
 
     // --- local status mode
     private ByteBuf statusBuf;
@@ -101,6 +102,17 @@ public final class EuFrontendHandler extends ChannelInboundHandlerAdapter {
         vc.registry.register(clientAddressKey, inbound);
         Metrics.INSTANCE.connectionsTotal.increment();
         // Nothing is connected yet: the backend is picked once the handshake has been parsed.
+
+        final int handshakeTimeoutMs = vc.config.get().policy().handshakeTimeoutMs();
+        if (handshakeTimeoutMs > 0) {
+            handshakeTimer = ctx.executor().schedule(() -> {
+                if (mode == Mode.UNDECIDED && pendingBytes == 0 && !closed) {
+                    Metrics.INSTANCE.timeouts.increment();
+                    TerminalLogger.warn("Closing " + clientIp + ": no handshake within " + handshakeTimeoutMs + "ms");
+                    ctx.close();
+                }
+            }, handshakeTimeoutMs, TimeUnit.MILLISECONDS);
+        }
     }
 
     @Override
@@ -124,6 +136,7 @@ public final class EuFrontendHandler extends ChannelInboundHandlerAdapter {
     @Override
     public void channelInactive(final ChannelHandlerContext ctx) {
         closed = true;
+        cancel(handshakeTimer);
         cancel(decideTimeout);
         cancel(statusTimeout);
         releasePending();
