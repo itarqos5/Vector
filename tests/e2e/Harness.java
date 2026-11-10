@@ -353,6 +353,21 @@ public class Harness {
             check("reload action works", dash("POST", "/api/action", "{\"action\":\"reload\"}", "Cookie", cookie, csrf, cv)[1].contains("reloaded"), "reload");
             check("unknown action rejected", dash("POST", "/api/action", "{\"action\":\"rm-rf\"}", "Cookie", cookie, csrf, cv)[0].equals("400"), "unknown");
             check("dashboard actions are logged", logHas("[DASHBOARD]"), "no log");
+            String act = "/api/action";
+            check("dashboard can drain a backend", dash("POST", act, "{\"action\":\"drain\",\"backend\":\"a\"}", "Cookie", cookie, csrf, cv)[0].equals("200")
+                && dash("GET", "/api/state", null, "Cookie", cookie)[1].contains("\"draining\":true"), "drain");
+            check("dashboard can undrain it", dash("POST", act, "{\"action\":\"undrain\",\"backend\":\"a\"}", "Cookie", cookie, csrf, cv)[0].equals("200"), "undrain");
+            check("drain of an unknown backend is rejected", dash("POST", act, "{\"action\":\"drain\",\"backend\":\"zzz\"}", "Cookie", cookie, csrf, cv)[0].equals("400"), "drain zzz");
+            check("evacuate validates its backends", dash("POST", act, "{\"action\":\"evacuate\",\"from\":\"a\",\"to\":\"a\"}", "Cookie", cookie, csrf, cv)[0].equals("400"), "evac same");
+            check("kickall by backend works", dash("POST", act, "{\"action\":\"kickall\",\"backend\":\"b\"}", "Cookie", cookie, csrf, cv)[0].equals("200"), "kickall");
+            check("a safe setting can be changed (maintenance on)", dash("POST", act, "{\"action\":\"setting\",\"key\":\"maintenance-enabled\",\"value\":true}", "Cookie", cookie, csrf, cv)[0].equals("200")
+                && status(null).contains("Under maintenance"), "setting on");
+            check("setting is persisted to config.json", Files.readString(run.resolve("config.json")).contains("\"maintenance-enabled\": true"), "persist");
+            dash("POST", act, "{\"action\":\"setting\",\"key\":\"maintenance-enabled\",\"value\":false}", "Cookie", cookie, csrf, cv);
+            check("maintenance is off again", !status(null).contains("Under maintenance"), "setting off");
+            check("wrong value type is rejected", dash("POST", act, "{\"action\":\"setting\",\"key\":\"maintenance-enabled\",\"value\":\"yes\"}", "Cookie", cookie, csrf, cv)[0].equals("400"), "type");
+            check("secrets cannot be edited remotely", dash("POST", act, "{\"action\":\"setting\",\"key\":\"dashboard-password\",\"value\":\"x\"}", "Cookie", cookie, csrf, cv)[0].equals("400"), "secret");
+            check("config view lists the editable keys", dash("GET", "/api/config", null, "Cookie", cookie)[1].contains("\"editable\":{"), "editable");
             check("logout invalidates session", dash("POST", "/api/logout", "{}", "Cookie", cookie, csrf, cv)[0].equals("200") && dash("GET", "/api/state", null, "Cookie", cookie)[0].equals("401"), "logout");
             int last = 0; for (int i = 0; i < 6; i++) last = Integer.parseInt(dash("POST", "/api/login", "{\"password\":\"bad" + i + "\"}", csrf, cv)[0]);
             check("repeated wrong passwords lock out (429)", last == 429, "last=" + last);
