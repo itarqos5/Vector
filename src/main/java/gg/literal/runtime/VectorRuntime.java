@@ -38,11 +38,15 @@ public final class VectorRuntime {
         });
 
         final HealthChecker healthChecker = new HealthChecker(pool, holder, scheduler);
-        final VectorContext context = new VectorContext(holder, new ConnectionRegistry(), banList, pool);
+        final ConnectionLimiter limiter = new ConnectionLimiter();
+        final VectorContext context = new VectorContext(holder, new ConnectionRegistry(), banList, pool, limiter);
 
         probeBackends(config, pool, healthChecker);
         healthChecker.start();
-        scheduler.scheduleWithFixedDelay(banList::purgeExpired, 30, 30, TimeUnit.SECONDS);
+        scheduler.scheduleWithFixedDelay(() -> {
+            limiter.sweep(holder.get().limits().connectionRateWindowMs());
+            banList.purgeExpired();
+        }, 30, 30, TimeUnit.SECONDS);
 
         if (config.metrics().enabled()) {
             new MetricsServer(context).start();
