@@ -109,6 +109,9 @@
           <input id="playerFilter" type="search" placeholder="Name, IP or backend">
         </label>
         <span id="playerCount" class="muted small"></span>
+        <span class="toolbar-spacer"></span>
+        <button id="evacBtn" class="ghost" type="button">Move players…</button>
+        <button id="kickAllBtn" class="ghost" type="button">Disconnect everyone</button>
       </div>
       <div class="card flush">
         <div class="table-wrap">
@@ -251,6 +254,19 @@
     <div class="dialog-actions">
       <button type="button" class="ghost" id="bdCancel">Cancel</button>
       <button type="submit" class="danger">Ban and disconnect</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="evacDialog" class="dialog" aria-labelledby="evacTitle">
+  <form id="evacForm" method="dialog" autocomplete="off">
+    <h2 id="evacTitle" class="dialog-title">Move players to another backend</h2>
+    <p class="muted small">The source backend stops taking new players, its sessions are disconnected, and each player's next login goes to the target. Players reconnect automatically only if they rejoin.</p>
+    <label class="field"><span class="label">Move everyone from</span><select id="evacFrom" required></select></label>
+    <label class="field"><span class="label">to</span><select id="evacTo" required></select></label>
+    <div class="dialog-actions">
+      <button type="button" class="ghost" id="evacCancel">Cancel</button>
+      <button type="submit" class="danger">Move players</button>
     </div>
   </form>
 </dialog>

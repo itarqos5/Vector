@@ -707,6 +707,39 @@
     if (state.data) renderPlayers(state.data, true);
   });
 
+  // ---- bulk actions
+
+  $('kickAllBtn').addEventListener('click', async () => {
+    const online = state.data ? state.data.totals.connectionsActive : 0;
+    if (await confirmAction({
+      title: `Disconnect all ${online} connection${online === 1 ? '' : 's'}?`,
+      message: 'Everyone is kicked. They can rejoin immediately unless maintenance mode or a ban stops them.',
+      confirm: 'Disconnect everyone',
+    })) {
+      act({ action: 'kickall' }, 'Disconnected.');
+    }
+  });
+
+  $('evacBtn').addEventListener('click', () => {
+    const backends = state.data ? state.data.backends : [];
+    if (backends.length < 2) {
+      toast('You need at least two backends to move players between them.', true);
+      return;
+    }
+    for (const id of ['evacFrom', 'evacTo']) {
+      $(id).replaceChildren(...backends.map((b) => h('option', { value: b.name, text: `${b.name} (${b.active} open)` })));
+    }
+    $('evacTo').selectedIndex = 1;
+    $('evacDialog').showModal();
+  });
+
+  $('evacCancel').addEventListener('click', () => $('evacDialog').close());
+  $('evacForm').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const ok = await act({ action: 'evacuate', from: $('evacFrom').value, to: $('evacTo').value }, 'Moved.');
+    if (ok) $('evacDialog').close();
+  });
+
   // ---- ban dialog
 
   function openBanDialog(c) {
