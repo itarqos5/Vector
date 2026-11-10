@@ -172,6 +172,9 @@ public record VectorConfig(
      * @param maintenanceMessage disconnect text shown to refused players
      * @param maintenanceMotd MOTD shown in the server list while maintenance mode is on
      * @param fullMessage disconnect text when every available backend is at its max-connections cap
+     * @param minProtocol lowest accepted client protocol version at login (0 = no lower bound)
+     * @param maxProtocol highest accepted client protocol version at login (0 = no upper bound)
+     * @param protocolMessage disconnect text for clients outside the accepted range
      */
     public record Policy(
         boolean logChat,
@@ -181,7 +184,10 @@ public record VectorConfig(
         boolean maintenance,
         String maintenanceMessage,
         String maintenanceMotd,
-        String fullMessage
+        String fullMessage,
+        int minProtocol,
+        int maxProtocol,
+        String protocolMessage
     ) {
     }
 
@@ -213,7 +219,8 @@ public record VectorConfig(
             new Metrics(false, "127.0.0.1", 9100, ""),
             new Dashboard(true, "127.0.0.1", 3000, ""),
             new Policy(true, 120, 5000, 0, false, "\u00a7eThe server is under maintenance. Please try again later.", "\u00a76Under maintenance",
-                "\u00a7cAll servers are full right now. Please try again shortly.")
+                "\u00a7cAll servers are full right now. Please try again shortly.",
+                0, 0, "\u00a7cYour Minecraft version is not supported on this server.")
         );
     }
 

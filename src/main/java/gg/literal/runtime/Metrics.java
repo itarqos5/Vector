@@ -19,6 +19,7 @@ public final class Metrics {
     public final LongAdder blockedPacketLimit = new LongAdder();
     public final LongAdder blockedGlobalLimit = new LongAdder();
     public final LongAdder blockedMaintenance = new LongAdder();
+    public final LongAdder blockedProtocol = new LongAdder();
     public final LongAdder blockedWhitelist = new LongAdder();
 
     public final LongAdder statusFromCache = new LongAdder();
@@ -33,7 +34,8 @@ public final class Metrics {
     /** Sum of every refusal counter, for rate charts. */
     public long blockedTotal() {
         return blockedBan.sum() + blockedConnectionLimit.sum() + blockedConnectionRate.sum()
-            + blockedPacketLimit.sum() + blockedGlobalLimit.sum() + blockedWhitelist.sum() + blockedMaintenance.sum();
+            + blockedPacketLimit.sum() + blockedGlobalLimit.sum() + blockedWhitelist.sum() + blockedMaintenance.sum()
+            + blockedProtocol.sum();
     }
 
     private Metrics() {

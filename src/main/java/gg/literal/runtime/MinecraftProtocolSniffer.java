@@ -241,6 +241,11 @@ public final class MinecraftProtocolSniffer extends ChannelDuplexHandler {
                             Metrics.INSTANCE.blockedMaintenance);
                         return;
                     }
+                    if (!protocolAccepted()) {
+                        denyLogin(ctx, shownName, "PROTOCOL " + protocolVersion, config.get().policy().protocolMessage(),
+                            Metrics.INSTANCE.blockedProtocol);
+                        return;
+                    }
                     if (!isWhitelisted(valid ? name : null)) {
                         denyLogin(ctx, shownName, "WHITELIST", config.get().access().whitelistMessage(),
                             Metrics.INSTANCE.blockedWhitelist);
@@ -286,6 +291,13 @@ public final class MinecraftProtocolSniffer extends ChannelDuplexHandler {
     // -------------------------------------------------------------------------
     // S\u2192C packet parsing (LOGIN phase only — compression detection)
     // -------------------------------------------------------------------------
+
+    /** True if the handshake's protocol version lies inside the configured min/max range (0 = unbounded). */
+    private boolean protocolAccepted() {
+        final var policy = config.get().policy();
+        return (policy.minProtocol() == 0 || protocolVersion >= policy.minProtocol())
+            && (policy.maxProtocol() == 0 || protocolVersion <= policy.maxProtocol());
+    }
 
     private boolean isWhitelisted(final String validName) {
         if (!config.get().access().whitelistEnabled()) {

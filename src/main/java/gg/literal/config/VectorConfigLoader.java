@@ -148,8 +148,15 @@ public final class VectorConfigLoader {
             bool(root, "maintenance-enabled", dp.maintenance()),
             string(root, "maintenance-message", dp.maintenanceMessage()),
             string(root, "maintenance-motd", dp.maintenanceMotd()),
-            string(root, "full-message", dp.fullMessage())
+            string(root, "full-message", dp.fullMessage()),
+            intValue(root, "min-protocol", dp.minProtocol(), 0, Integer.MAX_VALUE),
+            intValue(root, "max-protocol", dp.maxProtocol(), 0, Integer.MAX_VALUE),
+            string(root, "protocol-message", dp.protocolMessage())
         );
+        if (policy.maxProtocol() != 0 && policy.minProtocol() > policy.maxProtocol()) {
+            throw new IllegalArgumentException("min-protocol (" + policy.minProtocol()
+                + ") must not be greater than max-protocol (" + policy.maxProtocol() + ")");
+        }
 
         return new VectorConfig(
             bindHost, bindPort, bossThreads, workerThreads, maxBytes, maxPackets,
@@ -363,6 +370,9 @@ public final class VectorConfigLoader {
         line(sb, "maintenance-message", Json.quote(d.policy().maintenanceMessage()));
         line(sb, "maintenance-motd", Json.quote(d.policy().maintenanceMotd()));
         line(sb, "full-message", Json.quote(d.policy().fullMessage()));
+        line(sb, "min-protocol", d.policy().minProtocol());
+        line(sb, "max-protocol", d.policy().maxProtocol());
+        line(sb, "protocol-message", Json.quote(d.policy().protocolMessage()));
         line(sb, "dashboard-enabled", d.dashboard().enabled());
         line(sb, "dashboard-host", Json.quote(d.dashboard().host()));
         line(sb, "dashboard-port", d.dashboard().port());

@@ -134,6 +134,14 @@ class VectorConfigLoaderTest {
     }
 
     @Test
+    void readsProtocolRangeAndRejectsInvertedBounds() throws Exception {
+        final VectorConfig cfg = load("{\"min-protocol\": 765, \"max-protocol\": 773}");
+        assertEquals(765, cfg.policy().minProtocol());
+        assertEquals(773, cfg.policy().maxProtocol());
+        assertTrue(failure("{\"min-protocol\": 800, \"max-protocol\": 700}").contains("min-protocol"));
+    }
+
+    @Test
     void reportsUnknownBalanceModes() throws Exception {
         assertTrue(failure("{\"balance-mode\": \"fastest\"}").contains("balance-mode"));
     }

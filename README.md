@@ -109,6 +109,7 @@ Older configs that only set `backend-host` / `backend-port` keep working as a si
 | `maintenance-enabled` | `false` | yes | Maintenance mode: refuse logins unless the username or IP is whitelisted. Toggle live with the `maintenance on/off` console command. |
 | `maintenance-message` | `§eThe server is under maintenance…` | yes | Disconnect text shown to refused players. |
 | `maintenance-motd` | `§6Under maintenance` | yes | MOTD shown in the server list while maintenance mode is on. |
+| `min-protocol` / `max-protocol` | `0` / `0` | yes | Accepted client protocol range at login (`0` = unbounded), e.g. `767` is Minecraft 1.21.1. Players outside it are refused with `protocol-message`. |
 | `dashboard-enabled` | `true` | no | Start the web dashboard. |
 | `dashboard-host` / `dashboard-port` | `127.0.0.1` / `3000` | no | Where the dashboard listens. Use `0.0.0.0` to reach it from other machines. |
 | `dashboard-password` | empty | no | Password for the dashboard. See [Dashboard](#dashboard). |

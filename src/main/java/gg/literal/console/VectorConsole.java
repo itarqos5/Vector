@@ -326,7 +326,8 @@ public final class VectorConsole {
             + " packet-limit=" + m.blockedPacketLimit.sum()
             + " global-limit=" + m.blockedGlobalLimit.sum()
             + " whitelist=" + m.blockedWhitelist.sum()
-            + " maintenance=" + m.blockedMaintenance.sum());
+            + " maintenance=" + m.blockedMaintenance.sum()
+            + " protocol=" + m.blockedProtocol.sum());
         TerminalLogger.info("Status pings: cache=" + m.statusFromCache.sum()
             + " offline=" + m.statusOffline.sum()
             + " backend=" + m.statusFromBackend.sum()
