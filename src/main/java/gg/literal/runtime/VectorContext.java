@@ -14,6 +14,7 @@ public final class VectorContext {
     public final BackendPool pool;
     public final ConnectionLimiter limiter;
     public final StatusService status;
+    public final MetricsHistory history;
 
     VectorContext(
         final ConfigHolder config,
@@ -22,7 +23,8 @@ public final class VectorContext {
         final Whitelist whitelist,
         final BackendPool pool,
         final ConnectionLimiter limiter,
-        final StatusService status
+        final StatusService status,
+        final MetricsHistory history
     ) {
         this.config = config;
         this.registry = registry;
@@ -31,6 +33,7 @@ public final class VectorContext {
         this.pool = pool;
         this.limiter = limiter;
         this.status = status;
+        this.history = history;
     }
 
     /**

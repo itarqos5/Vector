@@ -43,13 +43,16 @@ public final class VectorRuntime {
         final HealthChecker healthChecker = new HealthChecker(pool, holder, scheduler);
         final StatusService statusService = new StatusService(pool, holder, scheduler);
         final ConnectionLimiter limiter = new ConnectionLimiter();
+        final ConnectionRegistry registry = new ConnectionRegistry();
+        final MetricsHistory history = new MetricsHistory(registry);
         final VectorContext context = new VectorContext(
-            holder, new ConnectionRegistry(), banList, whitelist, pool, limiter, statusService);
+            holder, registry, banList, whitelist, pool, limiter, statusService, history);
 
         probeBackends(config, pool, healthChecker);
 
         statusService.start();
         healthChecker.start();
+        history.start(scheduler);
         scheduler.scheduleWithFixedDelay(() -> {
             limiter.sweep(holder.get().limits().connectionRateWindowMs());
             banList.purgeExpired();

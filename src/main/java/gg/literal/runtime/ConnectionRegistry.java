@@ -4,6 +4,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFutureListener;
+import io.netty.util.AttributeKey;
 
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
@@ -14,6 +15,20 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
 
 public final class ConnectionRegistry {
+
+    /** Epoch millis at which the client connected. */
+    public static final AttributeKey<Long> ATTR_CONNECTED_AT = AttributeKey.newInstance("vec-connected-at");
+
+    /** Read-only view of one open client connection. */
+    public record ConnectionInfo(
+        String ip,
+        int port,
+        String player,
+        String backend,
+        long connectedAtMillis,
+        Integer protocol
+    ) {
+    }
 
     /**
      * Key: "ip:port" (full socket address) — unique per connection.
@@ -112,6 +127,7 @@ public final class ConnectionRegistry {
     // -------------------------------------------------------------------------
 
     public void register(final String addressKey, final Channel channel) {
+        channel.attr(ATTR_CONNECTED_AT).set(System.currentTimeMillis());
         activeChannels.put(addressKey, channel);
     }
 
@@ -199,6 +215,35 @@ public final class ConnectionRegistry {
             }
         }
         return count;
+    }
+
+    /** Snapshot of every open connection, newest first. */
+    public List<ConnectionInfo> snapshot() {
+        final List<ConnectionInfo> out = new ArrayList<>();
+        for (final Map.Entry<String, Channel> entry : activeChannels.entrySet()) {
+            final String key = entry.getKey();
+            final Channel channel = entry.getValue();
+            final int colon = key.lastIndexOf(':');
+            int port = 0;
+            if (colon > 0) {
+                try {
+                    port = Integer.parseInt(key.substring(colon + 1));
+                } catch (NumberFormatException ignored) {
+                    // keep 0
+                }
+            }
+            final Long since = channel.attr(ATTR_CONNECTED_AT).get();
+            out.add(new ConnectionInfo(
+                colon > 0 ? key.substring(0, colon) : key,
+                port,
+                channel.attr(MinecraftProtocolSniffer.ATTR_PLAYER_NAME).get(),
+                channel.attr(EuFrontendHandler.ATTR_BACKEND).get(),
+                since == null ? 0L : since,
+                channel.attr(MinecraftProtocolSniffer.ATTR_PROTOCOL_VERSION).get()
+            ));
+        }
+        out.sort((a, b) -> Long.compare(b.connectedAtMillis(), a.connectedAtMillis()));
+        return out;
     }
 
     public int size() {
