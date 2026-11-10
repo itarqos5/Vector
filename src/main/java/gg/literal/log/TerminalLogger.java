@@ -2,6 +2,10 @@ package gg.literal.log;
 
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Deque;
+import java.util.List;
 
 public final class TerminalLogger {
 
@@ -17,7 +21,40 @@ public final class TerminalLogger {
     private static final String BRIGHT_RED_BG = "\u001B[101m";
     private static final String FLASH = "\u001B[5m";
 
+    /** One captured log line (plain text, no ANSI colours). */
+    public record LogEntry(long seq, long timeMillis, String level, String message) {
+    }
+
+    private static final int RECENT_CAPACITY = 500;
+    private static final Deque<LogEntry> RECENT = new ArrayDeque<>(RECENT_CAPACITY);
+    private static long nextSeq = 1;
+
     private TerminalLogger() {
+    }
+
+    /**
+     * Returns buffered log lines with a sequence number greater than {@code afterSeq}, oldest first.
+     * At most {@code max} of the newest matching lines are returned.
+     */
+    public static List<LogEntry> recent(final long afterSeq, final int max) {
+        final List<LogEntry> out = new ArrayList<>();
+        synchronized (RECENT) {
+            for (final LogEntry entry : RECENT) {
+                if (entry.seq() > afterSeq) {
+                    out.add(entry);
+                }
+            }
+        }
+        return out.size() > max ? new ArrayList<>(out.subList(out.size() - max, out.size())) : out;
+    }
+
+    private static void remember(final String level, final String message) {
+        synchronized (RECENT) {
+            if (RECENT.size() >= RECENT_CAPACITY) {
+                RECENT.removeFirst();
+            }
+            RECENT.addLast(new LogEntry(nextSeq++, System.currentTimeMillis(), level, message));
+        }
     }
 
     public static boolean isAnsiEnabled() {
@@ -47,6 +84,7 @@ public final class TerminalLogger {
     public static void fatal(final String message) {
         final String timestamp = LocalTime.now().format(FORMATTER);
         final String level = colorize("[FATAL]", BRIGHT_RED_BG + FLASH);
+        remember("FATAL", message);
         synchronized (LOCK) {
             System.err.println("[" + timestamp + "] " + level + " " + message);
         }
@@ -57,6 +95,7 @@ public final class TerminalLogger {
         final String timestamp = LocalTime.now().format(FORMATTER);
         final String colorizedLevel = colorize("[" + level + "]", levelColor);
         final String colorizedMessage = colorize(message, messageColor);
+        remember(level, message);
         synchronized (LOCK) {
             System.out.println("[" + timestamp + "] " + colorizedLevel + " " + colorizedMessage);
         }
