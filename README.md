@@ -16,6 +16,7 @@
 - **Abuse protection** — Per-IP concurrent connection and connection-rate limits, timed / CIDR bans with reasons, optional whitelist.
 - **Hot reload** — `reload` re-reads `config.json` and `whitelist.txt` without dropping players.
 - **Metrics** — Optional Prometheus (`/metrics`), JSON (`/stats`) and health (`/health`) endpoint.
+- **Web dashboard** — Live routing map, charts, player list, backend health, bans, whitelist, log tail and config reload in the browser. On port 3000 by default.
 
 ---
 
@@ -99,6 +100,9 @@ Older configs that only set `backend-host` / `backend-port` keep working as a si
 | `metrics-enabled` | `false` | no | Start the HTTP metrics endpoint. |
 | `metrics-host` / `metrics-port` | `127.0.0.1` / `9100` | no | Where it listens. |
 | `metrics-token` | empty | yes | If set, `/metrics` and `/stats` require `Authorization: Bearer <token>`. |
+| `dashboard-enabled` | `true` | no | Start the web dashboard. |
+| `dashboard-host` / `dashboard-port` | `127.0.0.1` / `3000` | no | Where the dashboard listens. Use `0.0.0.0` to reach it from other machines. |
+| `dashboard-password` | empty | no | Password for the dashboard. See [Dashboard](#dashboard). |
 | `bind-host`, `bind-port`, `boss-threads`, `worker-threads` | | no | Need a restart. `reload` tells you when one of these changed. |
 | `max-bytes-per-second`, `max-packets-per-second`, `connect-timeout-ms` | | yes | Per-connection packet limiter and backend connect timeout (new connections only). |
 
@@ -123,6 +127,25 @@ Notes:
 | `unban <ip\|cidr>`, `banlist` | Remove / list bans. |
 | `whitelist [list\|add\|remove] <name\|ip\|cidr>` | Manage `whitelist.txt`. |
 | `stop` | Shut down. |
+
+## Dashboard
+
+Open `http://localhost:3000` (change it with `dashboard-port`). It updates every two seconds and has six tabs:
+
+- **Overview** — a live map of players flowing through Vector to each backend (link width follows open connections, red means down), key figures, and ten-minute charts of connections, throughput and events per second.
+- **Players** — every open connection with player name, backend and protocol; kick, ban or send to another backend.
+- **Backends** — health, weight, open and total connections, failed connects and probe latency.
+- **Access** — add and remove bans (with duration and reason) and whitelist entries.
+- **Logs** — the console log with level and text filters.
+- **Config** — the active settings (secrets are only shown as set or not set) and a **Reload config.json** button.
+
+Access and security:
+
+- By default the dashboard listens on `127.0.0.1` with no password, and refuses requests whose `Host` header is not `localhost`, `127.0.0.1` or `::1` (this blocks DNS-rebinding attacks).
+- To use it remotely set `dashboard-host` (for example `0.0.0.0`) **and** `dashboard-password`. If you bind a non-loopback address without a password, Vector generates a random password for that run and prints it in the console.
+- With a password, sign-in creates a 12 hour `HttpOnly`, `SameSite=Strict` session. Five wrong passwords lock that IP out for a minute. Scripts can send `Authorization: Bearer <password>` instead.
+- Every change (kick, ban, whitelist, reload) needs a same-origin request carrying an `X-Requested-With` header, and is written to the console log as `[DASHBOARD]`.
+- The dashboard speaks plain HTTP. For access over the internet put it behind a reverse proxy that terminates HTTPS.
 
 ## Metrics
 
