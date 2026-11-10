@@ -52,6 +52,9 @@ public final class ConfigHolder {
         check(restartRequired, "metrics-enabled", previous.metrics().enabled(), next.metrics().enabled());
         check(restartRequired, "metrics-host", previous.metrics().host(), next.metrics().host());
         check(restartRequired, "metrics-port", previous.metrics().port(), next.metrics().port());
+        check(restartRequired, "dashboard-enabled", previous.dashboard().enabled(), next.dashboard().enabled());
+        check(restartRequired, "dashboard-host", previous.dashboard().host(), next.dashboard().host());
+        check(restartRequired, "dashboard-port", previous.dashboard().port(), next.dashboard().port());
 
         for (final Consumer<VectorConfig> listener : listeners) {
             listener.accept(next);

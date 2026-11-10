@@ -20,7 +20,8 @@ public record VectorConfig(
     Limits limits,
     Status status,
     Access access,
-    Metrics metrics
+    Metrics metrics,
+    Dashboard dashboard
 ) {
 
     /** A single upstream server. */
@@ -102,6 +103,15 @@ public record VectorConfig(
     public record Metrics(boolean enabled, String host, int port, String token) {
     }
 
+    /**
+     * Web dashboard.
+     *
+     * @param password login password; when empty the dashboard is open on a loopback address, and a random
+     *                 password is generated at startup if it is bound anywhere else
+     */
+    public record Dashboard(boolean enabled, String host, int port, String password) {
+    }
+
     public static VectorConfig defaults() {
         final int available = Runtime.getRuntime().availableProcessors();
         final int workerDefault = Math.max(1, available - 1);
@@ -125,7 +135,8 @@ public record VectorConfig(
             new Limits(20, 20, 10_000),
             new Status(true, 5000, "§cServer is currently offline", true),
             new Access(false, "§cYou are not whitelisted on this server."),
-            new Metrics(false, "127.0.0.1", 9100, "")
+            new Metrics(false, "127.0.0.1", 9100, ""),
+            new Dashboard(true, "127.0.0.1", 3000, "")
         );
     }
 

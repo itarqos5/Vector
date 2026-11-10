@@ -4,6 +4,7 @@ import gg.literal.bootstrap.BootstrapException;
 import gg.literal.config.VectorConfig.Access;
 import gg.literal.config.VectorConfig.BackendTarget;
 import gg.literal.config.VectorConfig.Backends;
+import gg.literal.config.VectorConfig.Dashboard;
 import gg.literal.config.VectorConfig.BalanceMode;
 import gg.literal.config.VectorConfig.Limits;
 import gg.literal.config.VectorConfig.Metrics;
@@ -119,9 +120,24 @@ public final class VectorConfigLoader {
             string(root, "metrics-token", dm.token())
         );
 
+        final Dashboard dd = d.dashboard();
+        final Dashboard dashboard = new Dashboard(
+            bool(root, "dashboard-enabled", dd.enabled()),
+            string(root, "dashboard-host", dd.host()),
+            intValue(root, "dashboard-port", dd.port(), 1, 65535),
+            string(root, "dashboard-password", dd.password())
+        );
+        if (dashboard.enabled() && dashboard.port() == bindPort) {
+            throw new IllegalArgumentException("dashboard-port must differ from bind-port (both are " + bindPort + ")");
+        }
+        if (dashboard.enabled() && metrics.enabled() && dashboard.port() == metrics.port()
+            && dashboard.host().equals(metrics.host())) {
+            throw new IllegalArgumentException("dashboard-port must differ from metrics-port (both are " + metrics.port() + ")");
+        }
+
         return new VectorConfig(
             bindHost, bindPort, bossThreads, workerThreads, maxBytes, maxPackets,
-            connectTimeout, proxyProtocol, backends, limits, status, access, metrics
+            connectTimeout, proxyProtocol, backends, limits, status, access, metrics, dashboard
         );
     }
 
@@ -262,7 +278,11 @@ public final class VectorConfigLoader {
         line(sb, "metrics-enabled", d.metrics().enabled());
         line(sb, "metrics-host", Json.quote(d.metrics().host()));
         line(sb, "metrics-port", d.metrics().port());
-        sb.append("  \"metrics-token\": ").append(Json.quote(d.metrics().token())).append('\n');
+        line(sb, "metrics-token", Json.quote(d.metrics().token()));
+        line(sb, "dashboard-enabled", d.dashboard().enabled());
+        line(sb, "dashboard-host", Json.quote(d.dashboard().host()));
+        line(sb, "dashboard-port", d.dashboard().port());
+        sb.append("  \"dashboard-password\": ").append(Json.quote(d.dashboard().password())).append('\n');
         sb.append("}\n");
         try {
             Files.writeString(path, sb.toString(), StandardCharsets.UTF_8);
