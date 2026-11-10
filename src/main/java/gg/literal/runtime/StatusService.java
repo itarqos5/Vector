@@ -80,7 +80,29 @@ public final class StatusService {
         return alloc.buffer().writeBytes(offlinePacket(clientProtocol));
     }
 
+    /** Serialised offline responses per client protocol, rebuilt when the MOTD changes. */
+    private final ConcurrentHashMap<Integer, byte[]> offlineCache = new ConcurrentHashMap<>();
+    private volatile String offlineCacheMotd = "";
+    private static final int OFFLINE_CACHE_LIMIT = 64;
+
     private byte[] offlinePacket(final int clientProtocol) {
+        final String motd = config.get().status().offlineMotd();
+        if (!motd.equals(offlineCacheMotd)) {
+            offlineCache.clear();
+            offlineCacheMotd = motd;
+        }
+        final byte[] cached = offlineCache.get(clientProtocol);
+        if (cached != null) {
+            return cached;
+        }
+        final byte[] built = buildOfflinePacket(clientProtocol);
+        if (offlineCache.size() < OFFLINE_CACHE_LIMIT) { // protocol numbers come from clients, so bound the cache
+            offlineCache.put(clientProtocol, built);
+        }
+        return built;
+    }
+
+    private byte[] buildOfflinePacket(final int clientProtocol) {
         final Map<String, Object> version = new LinkedHashMap<>();
         version.put("name", "Offline");
         version.put("protocol", (long) clientProtocol);
