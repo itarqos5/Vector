@@ -235,6 +235,11 @@
           <input id="logSearch" type="search" placeholder="Text in a message">
         </label>
         <label class="check"><input id="logFollow" type="checkbox" checked><span>Follow new lines</span></label>
+        <label class="check"><input id="logPause" type="checkbox"><span>Pause</span></label>
+        <span class="toolbar-spacer"></span>
+        <span id="logCount" class="muted small"></span>
+        <button id="logCopy" class="ghost" type="button">Copy</button>
+        <button id="logDownload" class="ghost" type="button">Download</button>
       </div>
       <div class="card flush">
         <div id="logBox" class="log" role="log" aria-live="off" tabindex="0"></div>

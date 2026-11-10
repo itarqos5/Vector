@@ -912,7 +912,7 @@
   }
 
   function appendLogs(entries) {
-    if (state.tab !== 'logs') return;
+    if (state.tab !== 'logs' || $('logPause').checked) return;
     const box = $('logBox');
     for (const entry of entries) if (logVisible(entry)) box.append(logLine(entry));
     while (box.childElementCount > MAX_LOG_LINES) box.firstElementChild.remove();
@@ -921,9 +921,38 @@
 
   function renderLogsFull() {
     const box = $('logBox');
-    box.replaceChildren(...state.logs.filter(logVisible).map(logLine));
+    const visible = state.logs.filter(logVisible);
+    box.replaceChildren(...visible.map(logLine));
+    $('logCount').textContent = `${visible.length} of ${state.logs.length} lines`;
     followLogs();
   }
+
+  /** The lines currently passing the level and search filters, formatted like the console. */
+  function visibleLogText() {
+    return state.logs.filter(logVisible)
+      .map((e) => `[${fmtClock(e.t)}] [${e.level}] ${e.message}`)
+      .join('\n');
+  }
+
+  $('logPause').addEventListener('change', () => { if (!$('logPause').checked) renderLogsFull(); });
+
+  $('logCopy').addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(visibleLogText());
+      toast('Copied the visible log lines.');
+    } catch (e) {
+      toast('The browser blocked copying. Use Download instead.', true);
+    }
+  });
+
+  $('logDownload').addEventListener('click', () => {
+    const blob = new Blob([`${visibleLogText()}\n`], { type: 'text/plain' });
+    const link = h('a', { href: URL.createObjectURL(blob), download: `vector-log-${new Date().toISOString().slice(0, 10)}.txt` });
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+  });
 
   $('logLevel').addEventListener('change', () => { prefs.set('logLevel', $('logLevel').value); renderLogsFull(); });
   $('logSearch').addEventListener('input', () => { prefs.set('logSearch', $('logSearch').value); renderLogsFull(); });
