@@ -126,6 +126,7 @@ public record VectorConfig(
      * @param maintenance whether maintenance mode is on: logins are refused (whitelisted names and IPs may still
      *                    join)
      * @param maintenanceMessage disconnect text shown to refused players
+     * @param maintenanceMotd MOTD shown in the server list while maintenance mode is on
      */
     public record Policy(
         boolean logChat,
@@ -133,7 +134,8 @@ public record VectorConfig(
         int handshakeTimeoutMs,
         int maxConnections,
         boolean maintenance,
-        String maintenanceMessage
+        String maintenanceMessage,
+        String maintenanceMotd
     ) {
     }
 
@@ -162,7 +164,7 @@ public record VectorConfig(
             new Access(false, "§cYou are not whitelisted on this server."),
             new Metrics(false, "127.0.0.1", 9100, ""),
             new Dashboard(true, "127.0.0.1", 3000, ""),
-            new Policy(true, 120, 5000, 0, false, "\u00a7eThe server is under maintenance. Please try again later.")
+            new Policy(true, 120, 5000, 0, false, "\u00a7eThe server is under maintenance. Please try again later.", "\u00a76Under maintenance")
         );
     }
 

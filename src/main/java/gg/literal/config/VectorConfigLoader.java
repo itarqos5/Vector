@@ -143,7 +143,8 @@ public final class VectorConfigLoader {
             intValue(root, "handshake-timeout-ms", dp.handshakeTimeoutMs(), 0, 600_000),
             intValue(root, "max-connections", dp.maxConnections(), 0, Integer.MAX_VALUE),
             bool(root, "maintenance-enabled", dp.maintenance()),
-            string(root, "maintenance-message", dp.maintenanceMessage())
+            string(root, "maintenance-message", dp.maintenanceMessage()),
+            string(root, "maintenance-motd", dp.maintenanceMotd())
         );
 
         return new VectorConfig(
@@ -296,6 +297,7 @@ public final class VectorConfigLoader {
         line(sb, "max-connections", d.policy().maxConnections());
         line(sb, "maintenance-enabled", d.policy().maintenance());
         line(sb, "maintenance-message", Json.quote(d.policy().maintenanceMessage()));
+        line(sb, "maintenance-motd", Json.quote(d.policy().maintenanceMotd()));
         line(sb, "dashboard-enabled", d.dashboard().enabled());
         line(sb, "dashboard-host", Json.quote(d.dashboard().host()));
         line(sb, "dashboard-port", d.dashboard().port());

@@ -25,12 +25,13 @@ import java.util.concurrent.TimeUnit;
  */
 public final class StatusService {
 
-    public enum Decision { OFFLINE, CACHED, PASSTHROUGH }
+    public enum Decision { MAINTENANCE, OFFLINE, CACHED, PASSTHROUGH }
 
     private record Snapshot(Map<String, Object> json, long takenAt) {
     }
 
     private final SyntheticStatus offline;
+    private final SyntheticStatus maintenance;
     private final BackendPool pool;
     private final ConfigHolder config;
     private final ScheduledExecutorService scheduler;
@@ -43,6 +44,7 @@ public final class StatusService {
         this.pool = pool;
         this.config = config;
         this.scheduler = scheduler;
+        this.maintenance = new SyntheticStatus("Maintenance", () -> config.get().policy().maintenanceMotd());
         this.offline = new SyntheticStatus("Offline", () -> config.get().status().offlineMotd());
     }
 
@@ -59,6 +61,9 @@ public final class StatusService {
 
     /** What to do with a status request arriving right now. */
     public Decision decide() {
+        if (config.get().policy().maintenance()) {
+            return Decision.MAINTENANCE;
+        }
         final VectorConfig.Status settings = config.get().status();
         if (pool.healthyCount() == 0 && !settings.offlineMotd().isEmpty()) {
             return Decision.OFFLINE;
@@ -79,7 +84,8 @@ public final class StatusService {
             }
         }
         Metrics.INSTANCE.statusOffline.increment();
-        return alloc.buffer().writeBytes(offline.packet(clientProtocol));
+        final SyntheticStatus synthetic = decision == Decision.MAINTENANCE ? maintenance : offline;
+        return alloc.buffer().writeBytes(synthetic.packet(clientProtocol));
     }
 
     // ------------------------------------------------------------------ refresh

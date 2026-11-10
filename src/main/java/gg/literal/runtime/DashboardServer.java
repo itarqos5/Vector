@@ -527,6 +527,7 @@ public final class DashboardServer {
         out.put("max-connections", c.policy().maxConnections());
         out.put("maintenance-enabled", c.policy().maintenance());
         out.put("maintenance-message", c.policy().maintenanceMessage());
+        out.put("maintenance-motd", c.policy().maintenanceMotd());
         out.put("handshake-timeout-ms", c.policy().handshakeTimeoutMs());
         out.put("dashboard-enabled", c.dashboard().enabled());
         out.put("dashboard-host", c.dashboard().host());

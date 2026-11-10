@@ -106,6 +106,7 @@ Older configs that only set `backend-host` / `backend-port` keep working as a si
 | `max-connections` | `0` | yes | Global cap on open client connections (status pings included). New connections beyond it are refused. `0` = unlimited. |
 | `maintenance-enabled` | `false` | yes | Maintenance mode: refuse logins unless the username or IP is whitelisted. Toggle live with the `maintenance on/off` console command. |
 | `maintenance-message` | `§eThe server is under maintenance…` | yes | Disconnect text shown to refused players. |
+| `maintenance-motd` | `§6Under maintenance` | yes | MOTD shown in the server list while maintenance mode is on. |
 | `dashboard-enabled` | `true` | no | Start the web dashboard. |
 | `dashboard-host` / `dashboard-port` | `127.0.0.1` / `3000` | no | Where the dashboard listens. Use `0.0.0.0` to reach it from other machines. |
 | `dashboard-password` | empty | no | Password for the dashboard. See [Dashboard](#dashboard). |
