@@ -15,12 +15,14 @@ public final class PacketLimiterHandler extends ChannelDuplexHandler {
 
     private final long maxBytesPerSecond;
     private final long maxPacketsPerSecond;
+    private final AutoBan autoBan;
 
     private long windowStart = System.nanoTime();
     private long bytesInWindow;
     private long packetsInWindow;
 
-    public PacketLimiterHandler(final long maxBytesPerSecond, final long maxPacketsPerSecond) {
+    public PacketLimiterHandler(final long maxBytesPerSecond, final long maxPacketsPerSecond, final AutoBan autoBan) {
+        this.autoBan = autoBan;
         this.maxBytesPerSecond = Math.max(1L, maxBytesPerSecond);
         this.maxPacketsPerSecond = Math.max(1L, maxPacketsPerSecond);
     }
@@ -39,6 +41,9 @@ public final class PacketLimiterHandler extends ChannelDuplexHandler {
 
         if (packetsInWindow > maxPacketsPerSecond || bytesInWindow > maxBytesPerSecond) {
             Metrics.INSTANCE.blockedPacketLimit.increment();
+            if (ctx.channel().remoteAddress() instanceof InetSocketAddress remote) {
+                autoBan.violation(remote.getAddress().getHostAddress(), "packet flood");
+            }
             final String offender = formatRemote(ctx);
             TerminalLogger.warn("Rate-limiter drop: " + offender
                 + " exceeded threshold packets=" + packetsInWindow + "/" + maxPacketsPerSecond

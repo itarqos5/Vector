@@ -13,11 +13,13 @@ public final class ConnectionLimitHandler extends ChannelInboundHandlerAdapter {
 
     private final ConnectionLimiter limiter;
     private final ConfigHolder config;
+    private final AutoBan autoBan;
     private String countedIp;
 
-    public ConnectionLimitHandler(final ConnectionLimiter limiter, final ConfigHolder config) {
+    public ConnectionLimitHandler(final ConnectionLimiter limiter, final ConfigHolder config, final AutoBan autoBan) {
         this.limiter = limiter;
         this.config = config;
+        this.autoBan = autoBan;
     }
 
     @Override
@@ -42,6 +44,7 @@ public final class ConnectionLimitHandler extends ChannelInboundHandlerAdapter {
             LOG.warn("Global connection limit of " + config.get().policy().maxConnections() + " reached; refusing " + ip);
         } else if (result == ConnectionLimiter.Result.TOO_FAST) {
             Metrics.INSTANCE.blockedConnectionRate.increment();
+            autoBan.violation(ip, "connection rate");
             LOG.warn("Connection rate limit: " + ip + " exceeded " + limits.maxConnectionRatePerIp()
                 + " connections per " + limits.connectionRateWindowMs() + "ms");
         } else {

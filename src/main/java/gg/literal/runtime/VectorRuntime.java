@@ -45,8 +45,9 @@ public final class VectorRuntime {
         final ConnectionLimiter limiter = new ConnectionLimiter();
         final ConnectionRegistry registry = new ConnectionRegistry();
         final MetricsHistory history = new MetricsHistory(registry);
+        final AutoBan autoBan = new AutoBan(holder, banList, registry);
         final VectorContext context = new VectorContext(
-            holder, registry, banList, whitelist, pool, limiter, statusService, history);
+            holder, registry, banList, whitelist, pool, limiter, statusService, history, autoBan);
 
         probeBackends(config, pool, healthChecker);
 
@@ -55,6 +56,7 @@ public final class VectorRuntime {
         history.start(scheduler);
         scheduler.scheduleWithFixedDelay(() -> {
             limiter.sweep(holder.get().limits().connectionRateWindowMs());
+            autoBan.sweep();
             banList.purgeExpired();
         }, 30, 30, TimeUnit.SECONDS);
 

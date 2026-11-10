@@ -22,14 +22,15 @@ public final class SecurePipelineInitializer extends ChannelInitializer<SocketCh
         // Limits are read per connection so a config reload applies to every new connection.
         final VectorConfig config = context.config.get();
         channel.pipeline().addLast("ban-check", banCheckHandler);
-        channel.pipeline().addLast("connection-limit", new ConnectionLimitHandler(context.limiter, context.config));
+        channel.pipeline().addLast("connection-limit", new ConnectionLimitHandler(context.limiter, context.config, context.autoBan));
         if (config.policy().idleTimeoutSeconds() > 0) {
             channel.pipeline().addLast("idle", new IdleStateHandler(config.policy().idleTimeoutSeconds(), 0, 0, TimeUnit.SECONDS));
         }
-        channel.pipeline().addLast("mc-sniffer", new MinecraftProtocolSniffer(context.whitelist, context.config));
+        channel.pipeline().addLast("mc-sniffer", new MinecraftProtocolSniffer(context.whitelist, context.config, context.autoBan));
         channel.pipeline().addLast("packet-limiter", new PacketLimiterHandler(
             config.maxBytesPerSecond(),
-            config.maxPacketsPerSecond()
+            config.maxPacketsPerSecond(),
+            context.autoBan
         ));
         channel.pipeline().addLast("eu-frontend", new EuFrontendHandler(context));
     }

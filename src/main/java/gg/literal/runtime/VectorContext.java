@@ -15,6 +15,7 @@ public final class VectorContext {
     public final ConnectionLimiter limiter;
     public final StatusService status;
     public final MetricsHistory history;
+    public final AutoBan autoBan;
 
     VectorContext(
         final ConfigHolder config,
@@ -24,7 +25,8 @@ public final class VectorContext {
         final BackendPool pool,
         final ConnectionLimiter limiter,
         final StatusService status,
-        final MetricsHistory history
+        final MetricsHistory history,
+        final AutoBan autoBan
     ) {
         this.config = config;
         this.registry = registry;
@@ -34,6 +36,7 @@ public final class VectorContext {
         this.limiter = limiter;
         this.status = status;
         this.history = history;
+        this.autoBan = autoBan;
     }
 
     /**

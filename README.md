@@ -142,6 +142,8 @@ Send players who joined through different host names to different backends:
 
 A host matches exactly first, then the most specific wildcard (`*.example.com` matches subdomains, not the bare domain), then a `"*"` catch-all. A host with no matching route may use every backend. Balancing, health, draining and caps apply inside the allowed set; if none of a route's backends is available the player is refused instead of being sent elsewhere. Routes are reloadable.
 
+Auto-ban counts three kinds of violation per IP: hitting the connection-rate limit, tripping the packet limiter, and connecting with a host name that is not in `allowed-hosts`. Automatic bans appear in the ban list with the reason `auto-ban: ...` and can be lifted with `unban`.
+
 ## Console commands
 
 | Command | Description |

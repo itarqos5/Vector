@@ -53,6 +53,7 @@ public final class MinecraftProtocolSniffer extends ChannelDuplexHandler {
 
     private final Whitelist whitelist;
     private final ConfigHolder config;
+    private final AutoBan autoBan;
 
     private State state = State.HANDSHAKE;
     private String playerName = null;
@@ -70,9 +71,10 @@ public final class MinecraftProtocolSniffer extends ChannelDuplexHandler {
     // S\u2192C accumulation buffer — used only during LOGIN to detect Set Compression.
     private ByteBuf outboundAccumulator;
 
-    public MinecraftProtocolSniffer(final Whitelist whitelist, final ConfigHolder config) {
+    public MinecraftProtocolSniffer(final Whitelist whitelist, final ConfigHolder config, final AutoBan autoBan) {
         this.whitelist = whitelist;
         this.config = config;
+        this.autoBan = autoBan;
     }
 
     // -------------------------------------------------------------------------
@@ -228,6 +230,7 @@ public final class MinecraftProtocolSniffer extends ChannelDuplexHandler {
                         blocked = true;
                         state = State.IGNORED;
                         Metrics.INSTANCE.blockedHost.increment();
+                        autoBan.violation(clientIp, "disallowed host name");
                         ctx.close();
                         return;
                     }
