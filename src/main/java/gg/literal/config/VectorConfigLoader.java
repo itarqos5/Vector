@@ -89,7 +89,8 @@ public final class VectorConfigLoader {
             intValue(root, "health-check-interval-ms", db.healthIntervalMs(), 250, 3_600_000),
             intValue(root, "health-check-timeout-ms", db.healthTimeoutMs(), 100, 600_000),
             intValue(root, "health-check-failures", db.healthFailThreshold(), 1, 1000),
-            intValue(root, "max-connect-attempts", db.maxConnectAttempts(), 1, 32)
+            intValue(root, "max-connect-attempts", db.maxConnectAttempts(), 1, 32),
+            healthMode(root, db.healthMode())
         );
 
         final Limits dl = d.limits();
@@ -221,6 +222,18 @@ public final class VectorConfigLoader {
         return s;
     }
 
+    private static VectorConfig.HealthMode healthMode(final Map<String, Object> root, final VectorConfig.HealthMode fallback) {
+        if (!root.containsKey("health-check-mode")) {
+            return fallback;
+        }
+        final String raw = string(root, "health-check-mode", fallback.name());
+        final VectorConfig.HealthMode mode = VectorConfig.HealthMode.parse(raw);
+        if (mode == null) {
+            throw new IllegalArgumentException("health-check-mode \"" + raw + "\" is unknown (use tcp or status)");
+        }
+        return mode;
+    }
+
     private static boolean bool(final Map<String, Object> map, final String key, final boolean fallback) {
         final Object value = map.get(key);
         if (value == null) {
@@ -274,6 +287,7 @@ public final class VectorConfigLoader {
         line(sb, "health-check-timeout-ms", d.backends().healthTimeoutMs());
         line(sb, "health-check-failures", d.backends().healthFailThreshold());
         line(sb, "max-connect-attempts", d.backends().maxConnectAttempts());
+        line(sb, "health-check-mode", Json.quote(d.backends().healthMode().name().toLowerCase()));
         line(sb, "boss-threads", d.bossThreads());
         line(sb, "worker-threads", d.workerThreads());
         line(sb, "max-bytes-per-second", d.maxBytesPerSecond());

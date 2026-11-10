@@ -86,6 +86,7 @@ Older configs that only set `backend-host` / `backend-port` keep working as a si
 | `balance-mode` | `round-robin` | yes | `round-robin`, `least-connections` (load ÷ weight), `weighted` (smooth weighted round-robin), `ip-hash` (a client IP sticks to one backend), `random`, or `least-latency` (prefers the backend with the fastest health probe, scaled by how loaded it is). |
 | `health-check-interval-ms` | `5000` | yes | Delay between TCP health probes. |
 | `health-check-timeout-ms` | `2000` | yes | Connect timeout of a probe. |
+| `health-check-mode` | `tcp` | yes | `tcp` only opens a connection to each backend. `status` sends a real server list ping (with a PROXY header when `proxy-protocol` is on), so a backend whose port is open but whose Minecraft server is hung is detected too. |
 | `health-check-failures` | `2` | yes | Consecutive failures (probes or real connects) before a backend is marked down. One success brings it back. |
 | `max-connect-attempts` | `3` | yes | How many different backends a joining player is tried against. |
 | `proxy-protocol` | `false` | yes | Send a PROXY protocol v2 header to the backend (Velocity: `haproxy-protocol = true`). |

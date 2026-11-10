@@ -506,6 +506,7 @@ public final class DashboardServer {
         out.put("health-check-timeout-ms", c.backends().healthTimeoutMs());
         out.put("health-check-failures", c.backends().healthFailThreshold());
         out.put("max-connect-attempts", c.backends().maxConnectAttempts());
+        out.put("health-check-mode", c.backends().healthMode().name().toLowerCase());
         out.put("boss-threads", c.bossThreads());
         out.put("worker-threads", c.workerThreads());
         out.put("max-bytes-per-second", c.maxBytesPerSecond());

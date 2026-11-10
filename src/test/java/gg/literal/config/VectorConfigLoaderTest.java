@@ -96,6 +96,13 @@ class VectorConfigLoaderTest {
     }
 
     @Test
+    void parsesHealthCheckMode() throws Exception {
+        assertEquals(VectorConfig.HealthMode.TCP, load("{}").backends().healthMode());
+        assertEquals(VectorConfig.HealthMode.STATUS, load("{\"health-check-mode\": \"Status\"}").backends().healthMode());
+        assertTrue(failure("{\"health-check-mode\": \"ping\"}").contains("health-check-mode"));
+    }
+
+    @Test
     void reportsUnknownBalanceModes() throws Exception {
         assertTrue(failure("{\"balance-mode\": \"fastest\"}").contains("balance-mode"));
     }

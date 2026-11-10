@@ -1,5 +1,9 @@
 package gg.literal.runtime;
 
+import gg.literal.config.VectorConfig;
+import gg.literal.detect.BackendDetector;
+
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.util.ArrayList;
@@ -59,10 +63,13 @@ public final class HealthChecker {
     }
 
     private void runRound(final boolean initial) {
-        final int timeout = config.get().backends().healthTimeoutMs();
+        final VectorConfig cfg = config.get();
+        final int timeout = cfg.backends().healthTimeoutMs();
+        final boolean statusProbe = cfg.backends().healthMode() == VectorConfig.HealthMode.STATUS;
+        final boolean proxyProtocol = cfg.proxyProtocol();
         final List<Future<?>> futures = new ArrayList<>();
         for (final Backend backend : pool.all()) {
-            futures.add(probes.submit(() -> probe(backend, timeout, initial)));
+            futures.add(probes.submit(() -> probe(backend, timeout, initial, statusProbe, proxyProtocol)));
         }
         for (final Future<?> future : futures) {
             try {
@@ -73,10 +80,19 @@ public final class HealthChecker {
         }
     }
 
-    private void probe(final Backend backend, final int timeoutMs, final boolean initial) {
+    private void probe(final Backend backend, final int timeoutMs, final boolean initial,
+                       final boolean statusProbe, final boolean proxyProtocol) {
         final long start = System.nanoTime();
-        try (Socket socket = new Socket()) {
-            socket.connect(new InetSocketAddress(backend.host(), backend.port()), timeoutMs);
+        try {
+            if (statusProbe) {
+                if (BackendDetector.fetchStatusJson(backend.host(), backend.port(), proxyProtocol, timeoutMs, timeoutMs, false) == null) {
+                    throw new IOException("no status response");
+                }
+            } else {
+                try (Socket socket = new Socket()) {
+                    socket.connect(new InetSocketAddress(backend.host(), backend.port()), timeoutMs);
+                }
+            }
             final long latency = (System.nanoTime() - start) / 1_000_000L;
             if (initial) {
                 pool.markInitial(backend, true, latency);

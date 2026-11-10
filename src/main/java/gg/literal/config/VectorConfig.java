@@ -74,6 +74,26 @@ public record VectorConfig(
         }
     }
 
+    /** How a backend is probed. */
+    public enum HealthMode {
+        /** A plain TCP connect: cheap and independent of PROXY protocol or forwarding settings. */
+        TCP,
+        /** A real server list ping: also proves the Minecraft server (not just the port) is answering. */
+        STATUS;
+
+        public static HealthMode parse(final String value) {
+            if (value == null) {
+                return null;
+            }
+            for (final HealthMode mode : values()) {
+                if (mode.name().equalsIgnoreCase(value.trim())) {
+                    return mode;
+                }
+            }
+            return null;
+        }
+    }
+
     /**
      * Backend pool settings.
      *
@@ -81,6 +101,7 @@ public record VectorConfig(
      * @param healthTimeoutMs      connect timeout of a health probe
      * @param healthFailThreshold  consecutive failures before a backend is marked down
      * @param maxConnectAttempts   how many distinct backends a player connection may try before giving up
+     * @param healthMode           how backends are probed
      */
     public record Backends(
         List<BackendTarget> targets,
@@ -88,7 +109,8 @@ public record VectorConfig(
         int healthIntervalMs,
         int healthTimeoutMs,
         int healthFailThreshold,
-        int maxConnectAttempts
+        int maxConnectAttempts,
+        HealthMode healthMode
     ) {
     }
 
@@ -170,7 +192,8 @@ public record VectorConfig(
                 5000,
                 2000,
                 2,
-                3
+                3,
+                HealthMode.TCP
             ),
             new Limits(20, 20, 10_000),
             new Status(true, 5000, "§cServer is currently offline", true),

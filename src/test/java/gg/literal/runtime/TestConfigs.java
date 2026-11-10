@@ -14,7 +14,7 @@ final class TestConfigs {
 
     static VectorConfig withBackends(final BalanceMode mode, final int failThreshold, final BackendTarget... targets) {
         final VectorConfig d = VectorConfig.defaults();
-        final Backends backends = new Backends(List.of(targets), mode, 5000, 2000, failThreshold, 3);
+        final Backends backends = new Backends(List.of(targets), mode, 5000, 2000, failThreshold, 3, VectorConfig.HealthMode.TCP);
         return new VectorConfig(
             d.bindHost(), d.bindPort(), d.bossThreads(), d.workerThreads(), d.maxBytesPerSecond(),
             d.maxPacketsPerSecond(), d.connectTimeoutMs(), d.proxyProtocol(), backends, d.limits(),
