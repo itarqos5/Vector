@@ -3,6 +3,7 @@
   'use strict';
 
   const POLL_MS = 2000;
+  const MAX_BACKOFF_MS = 15000;
   const MAX_HISTORY = 300;
   const MAX_LOG_LINES = 1000;
   const MAX_ACTIVITY = 500;
@@ -21,6 +22,8 @@
     timer: null,
     authRequired: false,
     lastOk: 0,
+    failures: 0,
+    countdownTimer: null,
   };
 
   const $ = (id) => document.getElementById(id);
@@ -236,8 +239,25 @@
     $('liveText').textContent = text;
   }
 
+  /** Delay before the next poll: the normal rate while healthy, doubling up to a cap while the server is unreachable. */
+  function nextDelay() {
+    return Math.min(POLL_MS * 2 ** Math.min(state.failures, 4), MAX_BACKOFF_MS);
+  }
+
+  function startCountdown(delay) {
+    clearInterval(state.countdownTimer);
+    const retryAt = Date.now() + delay;
+    const tick = () => {
+      const seconds = Math.max(0, Math.ceil((retryAt - Date.now()) / 1000));
+      setLive('lost', `Connection lost, retrying in ${seconds}s`);
+    };
+    tick();
+    state.countdownTimer = setInterval(tick, 500);
+  }
+
   async function poll(immediate) {
     clearTimeout(state.timer);
+    clearInterval(state.countdownTimer);
     if (document.hidden && !immediate) {
       state.timer = setTimeout(poll, POLL_MS);
       return;
@@ -246,13 +266,15 @@
       const res = await request(`/api/state?history=${state.historySeq}&log=${state.logSeq}&activity=${state.activitySeq}`);
       if (res.status === 401) { showLogin(); return; }
       if (!res.ok || !res.body) throw new Error('bad response');
+      state.failures = 0;
       apply(res.body);
       state.lastOk = Date.now();
       setLive('ok', `Live · up ${fmtDuration(res.body.now - res.body.startedAt)}`);
     } catch (e) {
-      setLive('lost', 'Connection lost, retrying');
+      state.failures++;
+      startCountdown(nextDelay());
     }
-    state.timer = setTimeout(poll, POLL_MS);
+    state.timer = setTimeout(poll, nextDelay());
   }
 
   document.addEventListener('visibilitychange', () => { if (!document.hidden) poll(true); });
