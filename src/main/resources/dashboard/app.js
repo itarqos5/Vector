@@ -972,23 +972,59 @@
       const res = await request('/api/config');
       if (res.status === 401) { showLogin(); return; }
       if (!res.ok) throw new Error('bad response');
-      const list = $('configList');
-      list.replaceChildren();
-      for (const [key, value] of Object.entries(res.body.settings)) {
-        let text;
-        if (key === 'backends') {
-          text = value.map((b) => `${b.name}  ${b.host}:${b.port}  weight ${b.weight}`).join('\n');
-        } else {
-          text = String(value);
-        }
-        const dd = h('dd', { text });
-        if (key === 'backends') dd.style.whiteSpace = 'pre-wrap';
-        list.append(h('dt', { text: key }), dd);
-      }
+      state.config = res.body;
+      renderConfig();
     } catch (e) {
       toast('Could not load the configuration.', true);
     }
   }
+
+  /** One control for an editable setting; saves as soon as the value is committed (toggle, Enter or leaving the field). */
+  function settingControl(key, type, value) {
+    const save = (v) => act({ action: 'setting', key, value: v }, `Saved ${key}.`).then((ok) => { if (!ok) loadConfig(); });
+    if (type === 'boolean') {
+      const box = h('input', { type: 'checkbox', 'aria-label': key });
+      box.checked = value === true;
+      box.addEventListener('change', () => save(box.checked));
+      return h('label', { class: 'switch' }, box, h('span', { text: box.checked ? 'on' : 'off' }));
+    }
+    const input = h('input', { type: type === 'number' ? 'number' : 'text', 'aria-label': key });
+    input.value = value;
+    if (type === 'number') input.min = '0';
+    input.addEventListener('change', () => {
+      if (type === 'number') {
+        const n = Number(input.value);
+        if (input.value === '' || !Number.isInteger(n) || n < 0) { toast(`${key} needs a whole number, 0 or more.`, true); loadConfig(); return; }
+        save(n);
+      } else {
+        save(input.value);
+      }
+    });
+    return input;
+  }
+
+  function renderConfig() {
+    const cfg = state.config;
+    if (!cfg) return;
+    const q = $('configFilter').value.trim().toLowerCase();
+    const list = $('configList');
+    list.replaceChildren();
+    for (const [key, value] of Object.entries(cfg.settings)) {
+      const type = cfg.editable[key];
+      const text = key === 'backends'
+        ? value.map((b) => `${b.name}  ${b.host}:${b.port}  weight ${b.weight}${b['max-connections'] ? `  cap ${b['max-connections']}` : ''}`).join('\n')
+        : key === 'routes'
+          ? (value.length ? value.map((r) => `${r.host} -> ${r.backends.join(', ')}`).join('\n') : '(none)')
+          : String(value);
+      if (q && !key.includes(q) && !text.toLowerCase().includes(q)) continue;
+      const dd = type ? h('dd', { class: 'editable' }, settingControl(key, type, value)) : h('dd', { text });
+      if (!type && text.includes('\n')) dd.style.whiteSpace = 'pre-wrap';
+      list.append(h('dt', { class: type ? 'is-editable' : '', text: key }), dd);
+    }
+    if (!list.childElementCount) list.append(h('dt', { text: 'No match' }), h('dd', { text: 'No setting contains that text.' }));
+  }
+
+  $('configFilter').addEventListener('input', renderConfig);
 
   $('reloadBtn').addEventListener('click', async () => {
     const ok = await act({ action: 'reload' }, 'Configuration reloaded.');

@@ -245,12 +245,16 @@
     <section id="tab-config" class="tab" aria-label="Config" hidden>
       <div class="toolbar">
         <button id="reloadBtn" class="primary">Reload config.json</button>
-        <span class="muted small">Applies backends, balancing, limits, status cache and whitelist settings without a restart.</span>
+        <label class="field inline">
+          <span class="label">Find a setting</span>
+          <input id="configFilter" type="search" placeholder="e.g. whitelist, limit, motd">
+        </label>
+        <span class="muted small">Settings with a control can be changed here and take effect immediately. Everything else is edited in config.json, then use Reload.</span>
       </div>
       <div class="card flush">
         <dl id="configList" class="kv"></dl>
       </div>
-      <p class="muted small note">This is a read-only view. Secrets are shown only as set or not set.</p>
+      <p class="muted small note">Secrets are shown only as set or not set. Changes made here rewrite config.json (comments in the file are not kept).</p>
     </section>
 
   </main>
