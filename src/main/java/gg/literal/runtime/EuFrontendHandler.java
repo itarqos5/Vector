@@ -13,6 +13,7 @@ import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.socket.SocketChannel;
+import io.netty.channel.WriteBufferWaterMark;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.haproxy.HAProxyCommand;
 import io.netty.handler.codec.haproxy.HAProxyMessage;
@@ -44,6 +45,9 @@ public final class EuFrontendHandler extends ChannelInboundHandlerAdapter {
 
     /** Name of the backend a connection is currently routed to (for the {@code list} command). */
     public static final AttributeKey<String> ATTR_BACKEND = AttributeKey.newInstance("vec-backend");
+
+    /** Channels are marked unwritable above 128 KiB of queued output and writable again below 32 KiB. */
+    static final WriteBufferWaterMark WATER_MARK = new WriteBufferWaterMark(32 * 1024, 128 * 1024);
 
     private static final int MAX_UNDECIDED_BYTES = 1024;
     private static final int MAX_STATUS_BUFFER = 256;
@@ -305,6 +309,7 @@ public final class EuFrontendHandler extends ChannelInboundHandlerAdapter {
             .option(ChannelOption.TCP_NODELAY, true)
             .option(ChannelOption.SO_KEEPALIVE, true)
             .option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)
+            .option(ChannelOption.WRITE_BUFFER_WATER_MARK, WATER_MARK)
             .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, cfg.connectTimeoutMs())
             .handler(new ChannelInitializer<SocketChannel>() {
                 @Override
