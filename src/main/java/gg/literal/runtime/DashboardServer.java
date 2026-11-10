@@ -654,6 +654,29 @@ public final class DashboardServer {
                     ? backend.name() + " is draining: no new players, " + backend.activeConnections() + " existing session(s) continue."
                     : backend.name() + " accepts new players again.");
             }
+            case "evacuate" -> {
+                final Backend from = ctx.pool.findByName(str(body, "from"));
+                final Backend to = ctx.pool.findByName(str(body, "to"));
+                if (from == null || to == null) return new Result(false, "Pick the backend to empty and the backend to move players to.");
+                if (from == to) return new Result(false, "Choose two different backends.");
+                from.setDraining(true);
+                final int moved = ctx.registry.evacuate(from.name(), to);
+                log(actor, "evacuate " + from.name() + " -> " + to.name() + " (" + moved + ")");
+                return new Result(true, from.name() + " is draining. Disconnected " + moved
+                    + " connection(s); their next login goes to " + to.name() + ".");
+            }
+            case "kickall" -> {
+                final String name = str(body, "backend");
+                final int count;
+                if (name.isEmpty()) {
+                    count = ctx.registry.kickIf(ip -> true);
+                } else {
+                    if (ctx.pool.findByName(name) == null) return new Result(false, "Unknown backend " + name + ".");
+                    count = ctx.registry.kickBackend(name);
+                }
+                log(actor, "kickall " + name + " (" + count + ")");
+                return new Result(true, "Disconnected " + count + " connection(s)" + (name.isEmpty() ? "." : " on " + name + "."));
+            }
             case "reload" -> {
                 try {
                     final List<String> restart = ctx.reload();
