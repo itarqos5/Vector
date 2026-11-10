@@ -152,6 +152,8 @@ Auto-ban counts three kinds of violation per IP: hitting the connection-rate lim
 | `players` / `find <name\|ip>` | List connected players with backend and session length, or search connections by name or IP. |
 | `backends` | Backend health, weight, open/total connections, failures and probe latency. |
 | `stats` | Traffic, blocked connections by reason, status ping counters. |
+| `kickall [backend]` | Disconnect everyone, or everyone routed to one backend. |
+| `evacuate <from> <to>` | Drain `from`, disconnect its players and send their next login to `to`. |
 | `drain <backend>` / `undrain <backend>` | Stop or resume sending new players to a backend; existing sessions continue. Useful before restarting a server. |
 | `reload` | Reload `config.json` and `whitelist.txt`. An invalid file is rejected and the old config stays active. |
 | `kick <ip>` | Disconnect a client. |

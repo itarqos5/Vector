@@ -241,6 +241,43 @@ public final class ConnectionRegistry {
         return kickByIp(ip);
     }
 
+    /** Closes every connection currently routed to the named backend (case-insensitive); returns how many. */
+    public int kickBackend(final String backendName) {
+        int count = 0;
+        for (final Channel channel : activeChannels.values()) {
+            final String backend = channel.attr(EuFrontendHandler.ATTR_BACKEND).get();
+            if (channel.isActive() && backend != null && backend.equalsIgnoreCase(backendName)) {
+                channel.close();
+                count++;
+            }
+        }
+        return count;
+    }
+
+    /**
+     * Disconnects everyone routed to {@code fromName} and sets a one-shot override so each of those IPs lands
+     * on {@code to} when they reconnect.
+     *
+     * @return number of connections closed
+     */
+    public int evacuate(final String fromName, final Backend to) {
+        final java.util.Set<String> ips = new java.util.LinkedHashSet<>();
+        int count = 0;
+        for (final Map.Entry<String, Channel> entry : activeChannels.entrySet()) {
+            final Channel channel = entry.getValue();
+            final String backend = channel.attr(EuFrontendHandler.ATTR_BACKEND).get();
+            if (channel.isActive() && backend != null && backend.equalsIgnoreCase(fromName)) {
+                ips.add(ipOfKey(entry.getKey()));
+                channel.close();
+                count++;
+            }
+        }
+        for (final String ip : ips) {
+            setNextBackend(ip, new InetSocketAddress(to.host(), to.port()));
+        }
+        return count;
+    }
+
     /**
      * Closes every active connection whose client IP satisfies {@code matcher} (used for CIDR bans).
      * Returns the number of channels closed.

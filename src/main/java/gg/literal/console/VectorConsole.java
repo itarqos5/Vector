@@ -80,6 +80,8 @@ public final class VectorConsole {
             case "players" -> players();
             case "find" -> find(parts);
             case "kick" -> kick(parts);
+            case "kickall" -> kickAll(parts);
+            case "evacuate" -> evacuate(parts);
             case "send" -> send(parts);
             case "ban" -> ban(parts);
             case "unban" -> unban(parts);
@@ -169,6 +171,40 @@ public final class VectorConsole {
         final long m = s / 60;
         s %= 60;
         return h > 0 ? h + "h " + m + "m" : m > 0 ? m + "m " + s + "s" : s + "s";
+    }
+
+    /** {@code kickall} closes every connection; {@code kickall <backend>} only those routed to that backend. */
+    private void kickAll(final String[] parts) {
+        final int count;
+        if (parts.length >= 2) {
+            if (ctx.pool.findByName(parts[1]) == null) {
+                TerminalLogger.warn("Unknown backend \"" + parts[1] + "\". Use 'backends' to list them.");
+                return;
+            }
+            count = ctx.registry.kickBackend(parts[1]);
+            TerminalLogger.info("Disconnected " + count + " connection(s) on " + parts[1] + ".");
+        } else {
+            count = ctx.registry.kickIf(ip -> true);
+            TerminalLogger.info("Disconnected all " + count + " connection(s).");
+        }
+        audit("kickall" + (parts.length >= 2 ? " " + parts[1] : "") + " (" + count + ")");
+    }
+
+    /** Drains a backend and moves its players: their next login goes to the target backend. */
+    private void evacuate(final String[] parts) {
+        if (parts.length < 3) { TerminalLogger.warn("Usage: evacuate <from-backend> <to-backend>"); return; }
+        final Backend from = ctx.pool.findByName(parts[1]);
+        final Backend to = ctx.pool.findByName(parts[2]);
+        if (from == null || to == null) {
+            TerminalLogger.warn("Unknown backend \"" + (from == null ? parts[1] : parts[2]) + "\". Use 'backends' to list them.");
+            return;
+        }
+        if (from == to) { TerminalLogger.warn("Choose two different backends."); return; }
+        from.setDraining(true);
+        final int moved = ctx.registry.evacuate(from.name(), to);
+        audit("evacuate " + from.name() + " -> " + to.name() + " (" + moved + ")");
+        TerminalLogger.info(BackendPool.describe(from) + " is now draining; disconnected " + moved
+            + " player connection(s), their next login goes to " + to.name() + ".");
     }
 
     private void kick(final String[] parts) {
@@ -424,6 +460,8 @@ public final class VectorConsole {
         TerminalLogger.info("  players                       - connected players with backend and session length");
         TerminalLogger.info("  find <name|ip>                - find connections by player name or IP");
         TerminalLogger.info("  kick <ip>                     - disconnect a player by IP");
+        TerminalLogger.info("  kickall [backend]             - disconnect everyone, or everyone on one backend");
+        TerminalLogger.info("  evacuate <from> <to>          - drain a backend and move its players to another");
         TerminalLogger.info("  send <ip> <backend>           - disconnect and route the next login to a named backend");
         TerminalLogger.info("  send <ip> <host> <port>        - transfer the client to another server (1.20.5+)");
         TerminalLogger.info("  ban <ip|cidr> [30m|12h|7d] [reason...] - ban (optionally timed) and kick");
