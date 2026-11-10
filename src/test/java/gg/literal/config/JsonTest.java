@@ -73,6 +73,32 @@ class JsonTest {
     }
 
     @Test
+    void ignoresLineAndBlockComments() {
+        final String text = "{\n  // the proxy port\n  \"bind-port\": 25565, /* inline */ \"x\": [1, /* two */ 2]\n  /* trailing block */\n}";
+        final Map<String, Object> root = Json.parseObject(text);
+        assertEquals(25565L, root.get("bind-port"));
+        assertEquals(List.of(1L, 2L), root.get("x"));
+    }
+
+    @Test
+    void commentMarkersInsideStringsAreKept() {
+        assertEquals("http://example.com/*x*/", Json.parse("\"http://example.com/*x*/\""));
+    }
+
+    @Test
+    void unterminatedBlockCommentIsAnError() {
+        assertThrows(IllegalArgumentException.class, () -> Json.parse("{} /* never closed"));
+    }
+
+    @Test
+    void acceptsTrailingCommas() {
+        assertEquals(List.of(1L, 2L), Json.parse("[1, 2,]"));
+        assertEquals(Map.of("a", 1L), Json.parse("{\"a\": 1,}"));
+        assertThrows(IllegalArgumentException.class, () -> Json.parse("[,]"));
+        assertThrows(IllegalArgumentException.class, () -> Json.parse("{,}"));
+    }
+
+    @Test
     void prettyOutputParsesBackToTheSameTree() {
         final String source = "{\"a\":1,\"list\":[1,2,3],\"objs\":[{\"x\":true},{\"y\":null}],\"nested\":{\"k\":\"v\"},\"empty\":{},\"none\":[]}";
         final Object tree = Json.parse(source);

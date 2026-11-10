@@ -103,6 +103,11 @@ public final class Json {
                 pos--;
                 throw error("Expected ',' or '}'");
             }
+            skipWhitespace();
+            if (peek() == '}') { // trailing comma
+                pos++;
+                return map;
+            }
         }
     }
 
@@ -126,6 +131,11 @@ public final class Json {
             if (next != ',') {
                 pos--;
                 throw error("Expected ',' or ']'");
+            }
+            skipWhitespace();
+            if (peek() == ']') { // trailing comma
+                pos++;
+                return list;
             }
         }
     }
@@ -215,9 +225,26 @@ public final class Json {
         return src.charAt(pos);
     }
 
+    /** Skips whitespace plus line comments (double slash) and block comments, so config files can be annotated. */
     private void skipWhitespace() {
-        while (pos < src.length() && Character.isWhitespace(src.charAt(pos))) {
-            pos++;
+        while (pos < src.length()) {
+            final char c = src.charAt(pos);
+            if (Character.isWhitespace(c)) {
+                pos++;
+            } else if (c == '/' && pos + 1 < src.length() && src.charAt(pos + 1) == '/') {
+                while (pos < src.length() && src.charAt(pos) != '\n') {
+                    pos++;
+                }
+            } else if (c == '/' && pos + 1 < src.length() && src.charAt(pos + 1) == '*') {
+                final int end = src.indexOf("*/", pos + 2);
+                if (end < 0) {
+                    pos = src.length();
+                    throw error("Unterminated comment");
+                }
+                pos = end + 2;
+            } else {
+                break;
+            }
         }
     }
 
