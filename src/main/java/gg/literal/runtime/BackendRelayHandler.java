@@ -11,6 +11,7 @@ public final class BackendRelayHandler extends ChannelInboundHandlerAdapter {
 
     private final Channel inboundChannel;
     private volatile boolean dataReceived;
+    private boolean flushNeeded;
 
     public BackendRelayHandler(final Channel inboundChannel) {
         this.inboundChannel = inboundChannel;
@@ -23,10 +24,21 @@ public final class BackendRelayHandler extends ChannelInboundHandlerAdapter {
             Metrics.INSTANCE.bytesToClients.add(buf.readableBytes());
         }
         if (inboundChannel.isActive()) {
-            inboundChannel.writeAndFlush(msg).addListener(ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE);
+            // Batched: flushed once per read loop in channelReadComplete.
+            flushNeeded = true;
+            inboundChannel.write(msg).addListener(ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE);
             return;
         }
         ReferenceCountUtil.release(msg);
+    }
+
+    @Override
+    public void channelReadComplete(final ChannelHandlerContext ctx) {
+        if (flushNeeded) {
+            flushNeeded = false;
+            inboundChannel.flush();
+        }
+        ctx.fireChannelReadComplete();
     }
 
     @Override

@@ -74,6 +74,7 @@ public final class EuFrontendHandler extends ChannelInboundHandlerAdapter {
     private VectorConfig cfg;
     private volatile Channel outboundChannel;
     private boolean backendReady;
+    private boolean flushNeeded;
     private Backend held;
     private final Set<Backend> tried = new HashSet<>();
     private int attempts;
@@ -389,6 +390,7 @@ public final class EuFrontendHandler extends ChannelInboundHandlerAdapter {
         while ((msg = pending.poll()) != null) {
             forward(inbound, outbound, msg);
         }
+        flushUpstream();
         pendingBytes = 0;
         inbound.config().setAutoRead(true);
     }
@@ -414,12 +416,30 @@ public final class EuFrontendHandler extends ChannelInboundHandlerAdapter {
         if (msg instanceof ByteBuf buf) {
             Metrics.INSTANCE.bytesFromClients.add(buf.readableBytes());
         }
-        outbound.writeAndFlush(msg).addListener((ChannelFutureListener) future -> {
+        // Writes are batched: the flush happens once per read loop in channelReadComplete.
+        flushNeeded = true;
+        outbound.write(msg).addListener((ChannelFutureListener) future -> {
             if (!future.isSuccess()) {
                 closeOnFlush(outbound);
                 closeOnFlush(inbound);
             }
         });
+    }
+
+    @Override
+    public void channelReadComplete(final ChannelHandlerContext ctx) {
+        flushUpstream();
+        ctx.fireChannelReadComplete();
+    }
+
+    private void flushUpstream() {
+        if (flushNeeded) {
+            flushNeeded = false;
+            final Channel out = outboundChannel;
+            if (out != null && out.isActive()) {
+                out.flush();
+            }
+        }
     }
 
     // =========================================================================
