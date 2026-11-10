@@ -733,6 +733,35 @@
     if (state.data) renderPlayers(state.data, true);
   });
 
+  // ---- export
+
+  /** RFC 4180 quoting: wrap in quotes when needed and double any quote inside. A leading = + - @ is
+   *  neutralised so a crafted value cannot run as a spreadsheet formula. */
+  function csvCell(value) {
+    let text = value == null ? '' : String(value);
+    if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`;
+    return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+  }
+
+  function connectionsCsv(d) {
+    const header = ['player', 'ip', 'port', 'backend', 'connected_seconds', 'bytes_from_client', 'bytes_to_client', 'protocol'];
+    const rows = d.connections.map((c) => [
+      c.player, c.ip, c.port, c.backend, Math.round((d.now - c.since) / 1000), c.bytesIn, c.bytesOut, c.protocol,
+    ]);
+    return [header, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n');
+  }
+
+  $('exportBtn').addEventListener('click', () => {
+    if (!state.data) return;
+    const blob = new Blob([`${connectionsCsv(state.data)}\r\n`], { type: 'text/csv' });
+    const link = h('a', { href: URL.createObjectURL(blob), download: `vector-players-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.csv` });
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+    toast(`Exported ${state.data.connections.length} connection${state.data.connections.length === 1 ? '' : 's'}.`);
+  });
+
   // ---- bulk actions
 
   $('kickAllBtn').addEventListener('click', async () => {
