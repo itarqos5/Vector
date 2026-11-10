@@ -25,6 +25,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
+import java.util.zip.GZIPOutputStream;
 
 /**
  * Browser dashboard served by the JDK built-in HTTP server: a static single page plus a small JSON API
@@ -46,7 +47,7 @@ public final class DashboardServer {
     private static final String CSRF_HEADER = "X-Requested-With";
     private static final String CSRF_VALUE = "vector-dashboard";
 
-    private record Asset(byte[] bytes, String contentType, String etag) {
+    private record Asset(byte[] bytes, byte[] gzip, String contentType, String etag) {
     }
 
     private record Attempts(int failures, long lockedUntil) {
@@ -585,7 +586,7 @@ public final class DashboardServer {
                 throw new IOException("missing resource /dashboard/" + name);
             }
             final byte[] bytes = in.readAllBytes();
-            return new Asset(bytes, type, etagOf(bytes));
+            return new Asset(bytes, gzip(bytes), type, etagOf(bytes));
         }
     }
 
@@ -593,13 +594,36 @@ public final class DashboardServer {
         final Asset asset = assets.get(name);
         ex.getResponseHeaders().add("Content-Type", asset.contentType());
         ex.getResponseHeaders().add("Cache-Control", "no-cache");
-        ex.getResponseHeaders().add("ETag", asset.etag());
-        if (asset.etag().equals(ex.getRequestHeaders().getFirst("If-None-Match"))) {
+        ex.getResponseHeaders().add("Vary", "Accept-Encoding");
+        final boolean compressed = acceptsGzip(ex) && asset.gzip().length < asset.bytes().length;
+        // The compressed variant is a different representation, so it gets its own validator.
+        final String etag = compressed ? asset.etag().substring(0, asset.etag().length() - 1) + "-gz\"" : asset.etag();
+        ex.getResponseHeaders().add("ETag", etag);
+        if (etag.equals(ex.getRequestHeaders().getFirst("If-None-Match"))) {
             ex.sendResponseHeaders(304, -1);
             return;
         }
-        ex.sendResponseHeaders(200, asset.bytes().length);
-        ex.getResponseBody().write(asset.bytes());
+        final byte[] body = compressed ? asset.gzip() : asset.bytes();
+        if (compressed) {
+            ex.getResponseHeaders().add("Content-Encoding", "gzip");
+        }
+        ex.sendResponseHeaders(200, body.length);
+        ex.getResponseBody().write(body);
+    }
+
+    private static boolean acceptsGzip(final HttpExchange ex) {
+        final String accept = ex.getRequestHeaders().getFirst("Accept-Encoding");
+        return accept != null && accept.toLowerCase(Locale.ROOT).contains("gzip");
+    }
+
+    private static byte[] gzip(final byte[] bytes) {
+        final ByteArrayOutputStream buffer = new ByteArrayOutputStream(bytes.length / 3 + 64);
+        try (GZIPOutputStream out = new GZIPOutputStream(buffer)) {
+            out.write(bytes);
+        } catch (IOException ex) {
+            throw new IllegalStateException(ex); // cannot happen for an in-memory stream
+        }
+        return buffer.toByteArray();
     }
 
     /** Strong validator derived from the content, so browsers revalidate cheaply with a 304. */
