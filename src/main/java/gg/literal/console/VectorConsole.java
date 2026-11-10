@@ -3,18 +3,26 @@ package gg.literal.console;
 import gg.literal.log.TerminalLogger;
 import gg.literal.runtime.Backend;
 import gg.literal.runtime.BackendPool;
+import gg.literal.runtime.BanList;
 import gg.literal.runtime.Metrics;
 import gg.literal.runtime.VectorContext;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.text.SimpleDateFormat;
+import java.util.Arrays;
+import java.util.Date;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public final class VectorConsole {
 
     private static final String ANSI_RED   = "\u001B[31m";
     private static final String ANSI_GREEN = "\u001B[32m";
     private static final String ANSI_RESET = "\u001B[0m";
+
+    private static final Pattern DURATION = Pattern.compile("(\\d+)([smhdw])");
 
     private final VectorContext ctx;
 
@@ -97,34 +105,9 @@ public final class VectorConsole {
 
             case "send" -> send(parts);
 
-            case "ban" -> {
-                if (parts.length < 2) { TerminalLogger.warn("Usage: ban <ip>"); return; }
-                final String ip = parts[1];
-                ctx.banList.ban(ip);
-                TerminalLogger.info("Banned: " + ip);
-                final int kicked = ctx.registry.kickByIp(ip);
-                if (kicked > 0) TerminalLogger.info("Kicked " + kicked + " active connection(s) from " + ip);
-            }
-
-            case "unban" -> {
-                if (parts.length < 2) { TerminalLogger.warn("Usage: unban <ip>"); return; }
-                final String ip = parts[1];
-                if (ctx.banList.unban(ip)) {
-                    TerminalLogger.info("Unbanned: " + ip);
-                } else {
-                    TerminalLogger.warn("IP not found in ban list: " + ip);
-                }
-            }
-
-            case "banlist" -> {
-                final var all = ctx.banList.all();
-                if (all.isEmpty()) {
-                    TerminalLogger.info("Ban list is empty.");
-                } else {
-                    TerminalLogger.info("Banned IPs (" + all.size() + "):");
-                    for (final String ip : all) TerminalLogger.info("  " + ip);
-                }
-            }
+            case "ban" -> ban(parts);
+            case "unban" -> unban(parts);
+            case "banlist" -> banlist();
 
             case "stop" -> {
                 TerminalLogger.info("Stopping Vector...");
@@ -167,6 +150,79 @@ public final class VectorConsole {
         }
         ctx.registry.sendToServer(ip, destHost, destPort);
         TerminalLogger.info("[SEND] Transferring " + ip + " -> " + destHost + ":" + destPort);
+    }
+
+    private void ban(final String[] parts) {
+        if (parts.length < 2) {
+            TerminalLogger.warn("Usage: ban <ip|cidr> [duration e.g. 30m, 12h, 7d] [reason...]");
+            return;
+        }
+        long durationMillis = 0L;
+        int reasonStart = 2;
+        if (parts.length > 2) {
+            final long parsed = parseDuration(parts[2]);
+            if (parsed > 0) {
+                durationMillis = parsed;
+                reasonStart = 3;
+            }
+        }
+        final String reason = String.join(" ", Arrays.copyOfRange(parts, Math.min(reasonStart, parts.length), parts.length));
+
+        final BanList.Entry entry = ctx.banList.ban(parts[1], durationMillis, reason);
+        if (entry == null) {
+            TerminalLogger.warn("Not a valid IP address or CIDR block: " + parts[1]);
+            return;
+        }
+        TerminalLogger.info("Banned " + describe(entry));
+        final int kicked = ctx.registry.kickIf(ctx.banList::isBanned);
+        if (kicked > 0) TerminalLogger.info("Kicked " + kicked + " active connection(s)");
+    }
+
+    private void unban(final String[] parts) {
+        if (parts.length < 2) { TerminalLogger.warn("Usage: unban <ip|cidr>"); return; }
+        if (ctx.banList.unban(parts[1])) {
+            TerminalLogger.info("Unbanned: " + parts[1]);
+        } else {
+            TerminalLogger.warn("Not found in ban list: " + parts[1]);
+        }
+    }
+
+    private void banlist() {
+        final List<BanList.Entry> all = ctx.banList.all();
+        if (all.isEmpty()) {
+            TerminalLogger.info("Ban list is empty.");
+        } else {
+            TerminalLogger.info("Bans (" + all.size() + "):");
+            for (final BanList.Entry entry : all) TerminalLogger.info("  " + describe(entry));
+        }
+    }
+
+    private static String describe(final BanList.Entry entry) {
+        final StringBuilder sb = new StringBuilder(entry.target());
+        sb.append(entry.permanent()
+            ? " (permanent"
+            : " (until " + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date(entry.expiresAtMillis())));
+        if (!entry.reason().isEmpty()) sb.append(": ").append(entry.reason());
+        return sb.append(')').toString();
+    }
+
+    /** Parses {@code 30s}, {@code 15m}, {@code 12h}, {@code 7d}, {@code 2w}; returns -1 if {@code token} isn't a duration. */
+    private static long parseDuration(final String token) {
+        final Matcher m = DURATION.matcher(token.toLowerCase());
+        if (!m.matches()) return -1L;
+        final long amount = Long.parseLong(m.group(1));
+        final long unit = switch (m.group(2).charAt(0)) {
+            case 's' -> 1_000L;
+            case 'm' -> 60_000L;
+            case 'h' -> 3_600_000L;
+            case 'd' -> 86_400_000L;
+            default -> 604_800_000L;
+        };
+        try {
+            return Math.multiplyExact(amount, unit);
+        } catch (ArithmeticException ex) {
+            return -1L;
+        }
     }
 
     private void backends() {
@@ -217,9 +273,9 @@ public final class VectorConsole {
         TerminalLogger.info("  kick <ip>                     - disconnect a player by IP");
         TerminalLogger.info("  send <ip> <backend>           - disconnect and route the next login to a named backend");
         TerminalLogger.info("  send <ip> <host> <port>        - transfer the client to another server (1.20.5+)");
-        TerminalLogger.info("  ban <ip>                      - ban IP and kick any active session");
-        TerminalLogger.info("  unban <ip>                    - remove IP from ban list");
-        TerminalLogger.info("  banlist                       - show all banned IPs");
+        TerminalLogger.info("  ban <ip|cidr> [30m|12h|7d] [reason...] - ban (optionally timed) and kick");
+        TerminalLogger.info("  unban <ip|cidr>               - remove a ban");
+        TerminalLogger.info("  banlist                       - show all bans");
         TerminalLogger.info("  stop                          - gracefully shut down Vector");
     }
 }

@@ -16,6 +16,7 @@ import io.netty.channel.socket.nio.NioServerSocketChannel;
 import java.nio.file.Path;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public final class VectorRuntime {
 
@@ -41,6 +42,7 @@ public final class VectorRuntime {
 
         probeBackends(config, pool, healthChecker);
         healthChecker.start();
+        scheduler.scheduleWithFixedDelay(banList::purgeExpired, 30, 30, TimeUnit.SECONDS);
 
         if (config.metrics().enabled()) {
             new MetricsServer(context).start();

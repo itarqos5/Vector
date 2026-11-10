@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Predicate;
 
 public final class ConnectionRegistry {
 
@@ -177,6 +178,23 @@ public final class ConnectionRegistry {
     public int sendToBackend(final String ip, final Backend backend) {
         setNextBackend(ip, new InetSocketAddress(backend.host(), backend.port()));
         return kickByIp(ip);
+    }
+
+    /**
+     * Closes every active connection whose client IP satisfies {@code matcher} (used for CIDR bans).
+     * Returns the number of channels closed.
+     */
+    public int kickIf(final Predicate<String> matcher) {
+        int count = 0;
+        for (final Map.Entry<String, Channel> entry : activeChannels.entrySet()) {
+            final String key = entry.getKey();
+            final int colon = key.lastIndexOf(':');
+            if (colon > 0 && matcher.test(key.substring(0, colon)) && entry.getValue().isActive()) {
+                entry.getValue().close();
+                count++;
+            }
+        }
+        return count;
     }
 
     public int size() {
