@@ -392,6 +392,7 @@ public final class DashboardServer {
         blocked.put("whitelist", m.blockedWhitelist.sum());
         blocked.put("maintenance", m.blockedMaintenance.sum());
         blocked.put("protocol", m.blockedProtocol.sum());
+        blocked.put("host", m.blockedHost.sum());
         root.put("blocked", blocked);
 
         final Map<String, Object> status = new LinkedHashMap<>();
@@ -545,6 +546,7 @@ public final class DashboardServer {
         out.put("min-protocol", c.policy().minProtocol());
         out.put("max-protocol", c.policy().maxProtocol());
         out.put("protocol-message", c.policy().protocolMessage());
+        out.put("allowed-hosts", c.policy().allowedHosts().isEmpty() ? "(any)" : String.join(", ", c.policy().allowedHosts()));
         out.put("handshake-timeout-ms", c.policy().handshakeTimeoutMs());
         out.put("dashboard-enabled", c.dashboard().enabled());
         out.put("dashboard-host", c.dashboard().host());

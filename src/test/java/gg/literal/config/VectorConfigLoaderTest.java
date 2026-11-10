@@ -142,6 +142,15 @@ class VectorConfigLoaderTest {
     }
 
     @Test
+    void readsAllowedHosts() throws Exception {
+        assertTrue(load("{}").policy().allowedHosts().isEmpty());
+        assertEquals(java.util.List.of("play.example.com", "*.example.net"),
+            load("{\"allowed-hosts\": [\" play.example.com \", \"*.example.net\"]}").policy().allowedHosts());
+        assertTrue(failure("{\"allowed-hosts\": \"play.example.com\"}").contains("allowed-hosts"));
+        assertTrue(failure("{\"allowed-hosts\": [\"\"]}").contains("allowed-hosts"));
+    }
+
+    @Test
     void reportsUnknownBalanceModes() throws Exception {
         assertTrue(failure("{\"balance-mode\": \"fastest\"}").contains("balance-mode"));
     }

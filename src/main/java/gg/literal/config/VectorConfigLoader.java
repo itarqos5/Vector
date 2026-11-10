@@ -151,7 +151,8 @@ public final class VectorConfigLoader {
             string(root, "full-message", dp.fullMessage()),
             intValue(root, "min-protocol", dp.minProtocol(), 0, Integer.MAX_VALUE),
             intValue(root, "max-protocol", dp.maxProtocol(), 0, Integer.MAX_VALUE),
-            string(root, "protocol-message", dp.protocolMessage())
+            string(root, "protocol-message", dp.protocolMessage()),
+            stringList(root, "allowed-hosts", dp.allowedHosts())
         );
         if (policy.maxProtocol() != 0 && policy.minProtocol() > policy.maxProtocol()) {
             throw new IllegalArgumentException("min-protocol (" + policy.minProtocol()
@@ -289,6 +290,24 @@ public final class VectorConfigLoader {
         return mode;
     }
 
+    private static List<String> stringList(final Map<String, Object> map, final String key, final List<String> fallback) {
+        final Object value = map.get(key);
+        if (value == null) {
+            return fallback;
+        }
+        if (!(value instanceof List<?> list)) {
+            throw new IllegalArgumentException("\"" + key + "\" must be an array of strings");
+        }
+        final List<String> out = new ArrayList<>();
+        for (final Object element : list) {
+            if (!(element instanceof String s) || s.isBlank()) {
+                throw new IllegalArgumentException("\"" + key + "\" must only contain non-empty strings");
+            }
+            out.add(s.trim());
+        }
+        return List.copyOf(out);
+    }
+
     private static boolean bool(final Map<String, Object> map, final String key, final boolean fallback) {
         final Object value = map.get(key);
         if (value == null) {
@@ -373,6 +392,7 @@ public final class VectorConfigLoader {
         line(sb, "min-protocol", d.policy().minProtocol());
         line(sb, "max-protocol", d.policy().maxProtocol());
         line(sb, "protocol-message", Json.quote(d.policy().protocolMessage()));
+        line(sb, "allowed-hosts", Json.write(d.policy().allowedHosts()));
         line(sb, "dashboard-enabled", d.dashboard().enabled());
         line(sb, "dashboard-host", Json.quote(d.dashboard().host()));
         line(sb, "dashboard-port", d.dashboard().port());

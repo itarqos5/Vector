@@ -107,6 +107,7 @@ public final class MetricsServer {
         blocked(sb, "whitelist", m.blockedWhitelist.sum());
         blocked(sb, "maintenance", m.blockedMaintenance.sum());
         blocked(sb, "protocol", m.blockedProtocol.sum());
+        blocked(sb, "host", m.blockedHost.sum());
 
         sb.append("# HELP vector_status_responses_total Server list pings answered, by source\n# TYPE vector_status_responses_total counter\n");
         status(sb, "cache", m.statusFromCache.sum());
@@ -158,6 +159,7 @@ public final class MetricsServer {
         blocked.put("whitelist", m.blockedWhitelist.sum());
         blocked.put("maintenance", m.blockedMaintenance.sum());
         blocked.put("protocol", m.blockedProtocol.sum());
+        blocked.put("host", m.blockedHost.sum());
         root.put("blocked", blocked);
 
         final Map<String, Object> status = new LinkedHashMap<>();

@@ -175,6 +175,8 @@ public record VectorConfig(
      * @param minProtocol lowest accepted client protocol version at login (0 = no lower bound)
      * @param maxProtocol highest accepted client protocol version at login (0 = no upper bound)
      * @param protocolMessage disconnect text for clients outside the accepted range
+     * @param allowedHosts host names clients must have connected with (empty = any); connections using another
+     *                     name, including a bare IP, are dropped silently, which shuts out most scanners
      */
     public record Policy(
         boolean logChat,
@@ -187,7 +189,8 @@ public record VectorConfig(
         String fullMessage,
         int minProtocol,
         int maxProtocol,
-        String protocolMessage
+        String protocolMessage,
+        List<String> allowedHosts
     ) {
     }
 
@@ -220,7 +223,7 @@ public record VectorConfig(
             new Dashboard(true, "127.0.0.1", 3000, ""),
             new Policy(true, 120, 5000, 0, false, "\u00a7eThe server is under maintenance. Please try again later.", "\u00a76Under maintenance",
                 "\u00a7cAll servers are full right now. Please try again shortly.",
-                0, 0, "\u00a7cYour Minecraft version is not supported on this server.")
+                0, 0, "\u00a7cYour Minecraft version is not supported on this server.", List.of())
         );
     }
 

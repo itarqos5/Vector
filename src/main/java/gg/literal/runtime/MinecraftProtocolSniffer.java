@@ -11,6 +11,7 @@ import io.netty.util.ReferenceCountUtil;
 
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 /**
  * Peeks at the Minecraft Java Edition 1.21.x protocol (client -> server direction)
@@ -220,7 +221,16 @@ public final class MinecraftProtocolSniffer extends ChannelDuplexHandler {
                 if (packetId == 0x00) {
                     protocolVersion = readVarInt(accumulator);
                     ctx.channel().attr(ATTR_PROTOCOL_VERSION).set(protocolVersion);
-                    ctx.channel().attr(ATTR_HOSTNAME).set(HostNames.normalize(readString(accumulator)));
+                    final String hostname = HostNames.normalize(readString(accumulator));
+                    ctx.channel().attr(ATTR_HOSTNAME).set(hostname);
+                    if (!hostAllowed(hostname)) {
+                        // Scanners and bots usually connect by IP or an unknown name: drop them without a word.
+                        blocked = true;
+                        state = State.IGNORED;
+                        Metrics.INSTANCE.blockedHost.increment();
+                        ctx.close();
+                        return;
+                    }
                     accumulator.skipBytes(2);         // server port — unsigned short
                     final int nextState = readVarInt(accumulator);
                     ctx.channel().attr(ATTR_NEXT_STATE).set(nextState >= 1 && nextState <= 3 ? nextState : 0);
@@ -291,6 +301,22 @@ public final class MinecraftProtocolSniffer extends ChannelDuplexHandler {
     // -------------------------------------------------------------------------
     // S\u2192C packet parsing (LOGIN phase only — compression detection)
     // -------------------------------------------------------------------------
+
+    private List<String> allowedHostsSource;
+    private HostPatterns allowedHosts = HostPatterns.NONE;
+
+    /** True if no allow-list is configured or {@code hostname} matches it (the compiled list is cached per config). */
+    private boolean hostAllowed(final String hostname) {
+        final List<String> configured = config.get().policy().allowedHosts();
+        if (configured.isEmpty()) {
+            return true;
+        }
+        if (configured != allowedHostsSource) {
+            allowedHosts = HostPatterns.of(configured);
+            allowedHostsSource = configured;
+        }
+        return allowedHosts.matches(hostname);
+    }
 
     /** True if the handshake's protocol version lies inside the configured min/max range (0 = unbounded). */
     private boolean protocolAccepted() {
