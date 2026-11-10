@@ -2,7 +2,6 @@ package gg.literal.runtime;
 
 import gg.literal.log.TerminalLogger;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
@@ -61,9 +60,10 @@ public final class MinecraftProtocolSniffer extends ChannelDuplexHandler {
     private boolean outLoginPhase = false;
 
     // C\u2192S accumulation buffer — not shared, so no ref-count problems.
-    private final ByteBuf accumulator = Unpooled.buffer(512);
+    // Allocated lazily from the channel's pooled allocator and released as soon as sniffing is over.
+    private ByteBuf accumulator;
     // S\u2192C accumulation buffer — used only during LOGIN to detect Set Compression.
-    private final ByteBuf outboundAccumulator = Unpooled.buffer(256);
+    private ByteBuf outboundAccumulator;
 
     public MinecraftProtocolSniffer(final Whitelist whitelist, final ConfigHolder config) {
         this.whitelist = whitelist;
@@ -90,8 +90,14 @@ public final class MinecraftProtocolSniffer extends ChannelDuplexHandler {
         }
         if (msg instanceof ByteBuf data && state != State.IGNORED && state != State.STATUS) {
             // Copy into our private buffer WITHOUT consuming the original ByteBuf.
+            if (accumulator == null) {
+                accumulator = ctx.alloc().buffer(256);
+            }
             accumulator.writeBytes(data.slice());
             tryParse(ctx);
+            if (state == State.IGNORED || state == State.STATUS) {
+                releaseInbound(); // nothing more will be parsed on this connection
+            }
             if (blocked) {
                 ReferenceCountUtil.release(msg);
                 return;
@@ -107,8 +113,14 @@ public final class MinecraftProtocolSniffer extends ChannelDuplexHandler {
     @Override
     public void write(final ChannelHandlerContext ctx, final Object msg, final ChannelPromise promise) throws Exception {
         if (msg instanceof ByteBuf data && outLoginPhase && !compressionEnabled) {
+            if (outboundAccumulator == null) {
+                outboundAccumulator = ctx.alloc().buffer(128);
+            }
             outboundAccumulator.writeBytes(data.slice());
             tryParseOutbound(ctx);
+            if (!outLoginPhase || compressionEnabled) {
+                releaseOutbound();
+            }
         }
         ctx.write(msg, promise);
     }
@@ -119,8 +131,8 @@ public final class MinecraftProtocolSniffer extends ChannelDuplexHandler {
             TerminalLogger.info("[LEAVE] " + playerName + " (" + clientIp + ") disconnected");
             playerName = null;
         }
-        accumulator.release();
-        outboundAccumulator.release();
+        releaseInbound();
+        releaseOutbound();
         ctx.fireChannelInactive();
     }
 
@@ -130,9 +142,23 @@ public final class MinecraftProtocolSniffer extends ChannelDuplexHandler {
         markHandshakeUnknown(ctx);
         state = State.IGNORED;
         outLoginPhase = false;
-        accumulator.clear();
-        outboundAccumulator.clear();
+        releaseInbound();
+        releaseOutbound();
         ctx.fireExceptionCaught(cause);
+    }
+
+    private void releaseInbound() {
+        if (accumulator != null) {
+            accumulator.release();
+            accumulator = null;
+        }
+    }
+
+    private void releaseOutbound() {
+        if (outboundAccumulator != null) {
+            outboundAccumulator.release();
+            outboundAccumulator = null;
+        }
     }
 
     // -------------------------------------------------------------------------
