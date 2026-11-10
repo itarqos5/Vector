@@ -356,6 +356,38 @@ public class Harness {
             int last = 0; for (int i = 0; i < 6; i++) last = Integer.parseInt(dash("POST", "/api/login", "{\"password\":\"bad" + i + "\"}", csrf, cv)[0]);
             check("repeated wrong passwords lock out (429)", last == 429, "last=" + last);
             check("locked out even with the right password", dash("POST", "/api/login", "{\"password\":\"s3cret-pass\"}", csrf, cv)[0].equals("429"), "lock");
+
+            System.out.println("== maintenance mode");
+            cmd("whitelist remove 127.0.0.0/8"); cmd("whitelist remove Bob"); Thread.sleep(300);
+            cmd("maintenance on"); Thread.sleep(600);
+            check("maintenance written to config.json", Files.readString(run.resolve("config.json")).contains("\"maintenance-enabled\": true"), "file");
+            check("login refused with the maintenance message", login("Visitor").contains("under maintenance"), login("Visitor"));
+            check("status shows the maintenance MOTD", status(null).contains("Under maintenance"), status(null));
+            cmd("whitelist add Visitor"); Thread.sleep(300);
+            check("whitelisted staff can still join", login("Visitor").contains("backend:"), login("Visitor"));
+            cmd("whitelist remove Visitor"); cmd("maintenance off"); Thread.sleep(600);
+            check("logins work again after maintenance", login("Visitor").contains("backend:"), login("Visitor"));
+            check("blocked{maintenance} metric counted", http("/metrics").contains("vector_blocked_total{reason=\"maintenance\"}") && !http("/metrics").contains("vector_blocked_total{reason=\"maintenance\"} 0"), "metric");
+
+            System.out.println("== drain");
+            writeConfig(config(json("", ""), "")); cmd("reload"); Thread.sleep(500);
+            cmd("drain a"); Thread.sleep(300);
+            dist.clear();
+            for (int i = 0; i < 4; i++) dist.merge(login("D" + i), 1, Integer::sum);
+            check("draining backend gets no new players", dist.getOrDefault("{\"text\":\"backend:b\"}", 0) == 4, dist.toString());
+            cmd("undrain a"); Thread.sleep(300);
+            dist.clear();
+            for (int i = 0; i < 4; i++) dist.merge(login("U" + i), 1, Integer::sum);
+            check("undrained backend takes players again", dist.getOrDefault("{\"text\":\"backend:a\"}", 0) >= 1, dist.toString());
+
+            System.out.println("== host routing");
+            writeConfig(config(json("", ""), "\"routes\":[{\"host\":\"localhost\",\"backends\":[\"b\"]}],"));
+            cmd("reload"); Thread.sleep(600);
+            dist.clear();
+            for (int i = 0; i < 5; i++) dist.merge(login("R" + i), 1, Integer::sum);
+            check("route pins localhost to backend b", dist.getOrDefault("{\"text\":\"backend:b\"}", 0) == 5, dist.toString());
+            writeConfig(config(json("", ""), ""));
+            cmd("reload"); Thread.sleep(400);
             System.out.println("== console commands smoke");
             cmd("backends"); cmd("stats"); cmd("list"); cmd("banlist"); cmd("whitelist list"); Thread.sleep(500);
             check("backends/stats print", logHas("Backends (2") && logHas("Status pings: cache="), "missing output");
