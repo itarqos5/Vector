@@ -4,7 +4,7 @@ import gg.literal.bootstrap.BootstrapException;
 
 import java.util.List;
 
-/** Everything the pipeline handlers and console share. */
+/** Everything the pipeline handlers, console and metrics endpoint share. */
 public final class VectorContext {
 
     public final ConfigHolder config;
@@ -13,6 +13,7 @@ public final class VectorContext {
     public final Whitelist whitelist;
     public final BackendPool pool;
     public final ConnectionLimiter limiter;
+    public final StatusService status;
 
     VectorContext(
         final ConfigHolder config,
@@ -20,7 +21,8 @@ public final class VectorContext {
         final BanList banList,
         final Whitelist whitelist,
         final BackendPool pool,
-        final ConnectionLimiter limiter
+        final ConnectionLimiter limiter,
+        final StatusService status
     ) {
         this.config = config;
         this.registry = registry;
@@ -28,6 +30,7 @@ public final class VectorContext {
         this.whitelist = whitelist;
         this.pool = pool;
         this.limiter = limiter;
+        this.status = status;
     }
 
     /**

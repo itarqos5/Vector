@@ -21,30 +21,59 @@ import io.netty.handler.codec.haproxy.HAProxyProxiedProtocol;
 import io.netty.handler.codec.haproxy.HAProxyProtocolVersion;
 import io.netty.util.AttributeKey;
 import io.netty.util.ReferenceCountUtil;
+import io.netty.util.concurrent.ScheduledFuture;
 
 import java.net.Inet4Address;
 import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.util.ArrayDeque;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 /**
- * Connects each client to a backend chosen by the {@link BackendPool}. If the connect fails the
- * connection is retried on another backend before the client is dropped.
+ * Front door of every client connection.
+ *
+ * <p>The backend is chosen lazily: the first bytes are buffered until the sniffer has seen the handshake.
+ * Server list pings may then be answered locally from the {@link StatusService}; everything else is
+ * relayed to a backend picked by the {@link BackendPool}, with failover to another backend if the connect
+ * fails. Buffered bytes are replayed once the upstream connection is ready.
  */
 public final class EuFrontendHandler extends ChannelInboundHandlerAdapter {
 
     /** Name of the backend a connection is currently routed to (for the {@code list} command). */
     public static final AttributeKey<String> ATTR_BACKEND = AttributeKey.newInstance("vec-backend");
 
+    private static final int MAX_UNDECIDED_BYTES = 1024;
+    private static final int MAX_STATUS_BUFFER = 256;
+    private static final long UNDECIDED_TIMEOUT_MS = 1000L;
+    private static final long STATUS_TIMEOUT_MS = 5000L;
+
+    private enum Mode { UNDECIDED, STATUS, PROXY }
+
     private final VectorContext vc;
-    private VectorConfig cfg;
-    private volatile Channel outboundChannel;
+
+    private Mode mode = Mode.UNDECIDED;
+    private boolean closed;
     private String clientAddressKey;
     private String clientIp;
 
-    private boolean closed;
+    /** Bytes received before the upstream connection was ready, replayed in order afterwards. */
+    private final ArrayDeque<Object> pending = new ArrayDeque<>();
+    private int pendingBytes;
+    private ScheduledFuture<?> decideTimeout;
+
+    // --- local status mode
+    private ByteBuf statusBuf;
+    private StatusService.Decision statusDecision;
+    private boolean statusAnswered;
+    private ScheduledFuture<?> statusTimeout;
+
+    // --- proxy mode
+    private VectorConfig cfg;
+    private volatile Channel outboundChannel;
+    private boolean backendReady;
     private Backend held;
     private final Set<Backend> tried = new HashSet<>();
     private int attempts;
@@ -53,141 +82,48 @@ public final class EuFrontendHandler extends ChannelInboundHandlerAdapter {
         this.vc = vc;
     }
 
+    // =========================================================================
+    // Lifecycle
+    // =========================================================================
+
     @Override
     public void channelActive(final ChannelHandlerContext ctx) {
-        final Channel inboundChannel = ctx.channel();
-        clientAddressKey = ConnectionRegistry.toAddressKey(inboundChannel);
-        clientIp = ConnectionRegistry.toIp(inboundChannel);
-        vc.registry.register(clientAddressKey, inboundChannel);
+        final Channel inbound = ctx.channel();
+        clientAddressKey = ConnectionRegistry.toAddressKey(inbound);
+        clientIp = ConnectionRegistry.toIp(inbound);
+        vc.registry.register(clientAddressKey, inbound);
         Metrics.INSTANCE.connectionsTotal.increment();
-
-        inboundChannel.config().setAutoRead(false);
-        cfg = vc.config.get();
-
-        // Honour one-shot backend override set by the "send" console command
-        connect(ctx, vc.registry.pollNextBackend(clientIp));
-    }
-
-    private void connect(final ChannelHandlerContext ctx, final InetSocketAddress override) {
-        final Channel inboundChannel = ctx.channel();
-
-        final Backend chosen;
-        final String backendHost;
-        final int backendPort;
-        if (override != null) {
-            backendHost = override.getHostString();
-            backendPort = override.getPort();
-            chosen = vc.pool.find(backendHost, backendPort);
-            if (chosen != null) {
-                vc.pool.acquire(chosen);
-            }
-        } else {
-            chosen = vc.pool.select(clientIp, tried);
-            if (chosen == null) {
-                TerminalLogger.warn("No healthy backend available for " + clientIp
-                    + (tried.isEmpty() ? "" : " (after " + tried.size() + " failed attempt(s))"));
-                Metrics.INSTANCE.noBackendAvailable.increment();
-                closeOnFlush(inboundChannel);
-                return;
-            }
-            backendHost = chosen.host();
-            backendPort = chosen.port();
-        }
-        held = chosen;
-        inboundChannel.attr(ATTR_BACKEND).set(chosen != null ? chosen.name() : backendHost + ":" + backendPort);
-
-        final long startedAt = System.nanoTime();
-        final Bootstrap bootstrap = new Bootstrap()
-            .group(inboundChannel.eventLoop())
-            .channel(NioSocketChannel.class)
-            .option(ChannelOption.TCP_NODELAY, true)
-            .option(ChannelOption.SO_KEEPALIVE, true)
-            .option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)
-            .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, cfg.connectTimeoutMs())
-            .handler(new ChannelInitializer<SocketChannel>() {
-                @Override
-                protected void initChannel(final SocketChannel ch) {
-                    if (cfg.proxyProtocol()) {
-                        ch.pipeline().addLast("proxy-protocol-v2", HAProxyMessageEncoder.INSTANCE);
-                    }
-                    ch.pipeline().addLast("backend-relay", new BackendRelayHandler(inboundChannel));
-                }
-            });
-
-        final ChannelFuture connectFuture = bootstrap.connect(backendHost, backendPort);
-        outboundChannel = connectFuture.channel();
-
-        connectFuture.addListener((ChannelFutureListener) future -> {
-            if (closed) {
-                future.channel().close();
-                return;
-            }
-            if (!future.isSuccess()) {
-                final Throwable cause = future.cause();
-                final String reason = cause == null ? "unknown" : cause.getClass().getSimpleName() + ": " + cause.getMessage();
-                TerminalLogger.warn("Backend connection failed from " + formatAddress(inboundChannel.remoteAddress())
-                    + " to " + backendHost + ":" + backendPort + " (" + reason + ")");
-                releaseHeld();
-                outboundChannel = null;
-                if (chosen != null) {
-                    tried.add(chosen);
-                    vc.pool.report(chosen, false, -1L);
-                }
-                attempts++;
-                if (override == null && attempts < cfg.backends().maxConnectAttempts()) {
-                    connect(ctx, null); // fail over to another backend
-                } else {
-                    Metrics.INSTANCE.noBackendAvailable.increment();
-                    closeOnFlush(inboundChannel);
-                }
-                return;
-            }
-            if (chosen != null) {
-                vc.pool.report(chosen, true, (System.nanoTime() - startedAt) / 1_000_000L);
-            }
-
-            if (cfg.proxyProtocol()) {
-                final HAProxyMessage header = buildProxyV2Header(inboundChannel, outboundChannel);
-                outboundChannel.writeAndFlush(header).addListener((ChannelFutureListener) writeFuture -> {
-                    if (!writeFuture.isSuccess()) {
-                        TerminalLogger.warn("Failed sending Proxy Protocol header for "
-                            + formatAddress(inboundChannel.remoteAddress()));
-                        closeOnFlush(inboundChannel);
-                        closeOnFlush(outboundChannel);
-                        return;
-                    }
-                    if (outboundChannel.pipeline().get("proxy-protocol-v2") != null) {
-                        outboundChannel.pipeline().remove("proxy-protocol-v2");
-                    }
-                    inboundChannel.config().setAutoRead(true);
-                });
-            } else {
-                inboundChannel.config().setAutoRead(true);
-            }
-        });
+        // Nothing is connected yet: the backend is picked once the handshake has been parsed.
     }
 
     @Override
     public void channelRead(final ChannelHandlerContext ctx, final Object msg) {
-        final Channel out = outboundChannel;
-        if (out != null && out.isActive()) {
-            if (msg instanceof ByteBuf buf) {
-                Metrics.INSTANCE.bytesFromClients.add(buf.readableBytes());
+        switch (mode) {
+            case UNDECIDED -> {
+                queue(msg);
+                decide(ctx, false);
             }
-            out.writeAndFlush(msg).addListener((ChannelFutureListener) future -> {
-                if (!future.isSuccess()) {
-                    closeOnFlush(out);
-                    closeOnFlush(ctx.channel());
+            case STATUS -> handleStatusInput(ctx, msg);
+            case PROXY -> {
+                if (backendReady) {
+                    forward(ctx.channel(), outboundChannel, msg);
+                } else {
+                    queue(msg);
                 }
-            });
-            return;
+            }
         }
-        ReferenceCountUtil.release(msg);
     }
 
     @Override
     public void channelInactive(final ChannelHandlerContext ctx) {
         closed = true;
+        cancel(decideTimeout);
+        cancel(statusTimeout);
+        releasePending();
+        if (statusBuf != null) {
+            statusBuf.release();
+            statusBuf = null;
+        }
         if (clientAddressKey != null) {
             vc.registry.unregister(clientAddressKey);
         }
@@ -209,11 +145,313 @@ public final class EuFrontendHandler extends ChannelInboundHandlerAdapter {
         closeOnFlush(ctx.channel());
     }
 
+    // =========================================================================
+    // Deciding what the connection is
+    // =========================================================================
+
+    private void decide(final ChannelHandlerContext ctx, final boolean force) {
+        if (mode != Mode.UNDECIDED || closed) {
+            return;
+        }
+        Integer nextState = ctx.channel().attr(MinecraftProtocolSniffer.ATTR_NEXT_STATE).get();
+        if (nextState == null) {
+            if (!force && pendingBytes < MAX_UNDECIDED_BYTES) {
+                // Handshake not fully seen yet. Wait briefly; legacy/odd clients fall through to the proxy path.
+                if (decideTimeout == null) {
+                    decideTimeout = ctx.executor().schedule(() -> decide(ctx, true), UNDECIDED_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+                }
+                return;
+            }
+            nextState = 0;
+        }
+        cancel(decideTimeout);
+
+        if (nextState == 1) {
+            final StatusService.Decision decision = vc.status.decide();
+            if (decision != StatusService.Decision.PASSTHROUGH) {
+                beginLocalStatus(ctx, decision);
+                return;
+            }
+            Metrics.INSTANCE.statusFromBackend.increment();
+        }
+        beginProxy(ctx, nextState != 1);
+    }
+
+    // =========================================================================
+    // Local status responses
+    // =========================================================================
+
+    private void beginLocalStatus(final ChannelHandlerContext ctx, final StatusService.Decision decision) {
+        mode = Mode.STATUS;
+        statusDecision = decision;
+        statusBuf = ctx.alloc().buffer();
+        while (!pending.isEmpty()) {
+            final Object msg = pending.poll();
+            if (msg instanceof ByteBuf buf) {
+                statusBuf.writeBytes(buf);
+            }
+            ReferenceCountUtil.release(msg);
+        }
+        pendingBytes = 0;
+
+        // Drop the handshake packet; what follows is Status Request / Ping Request.
+        final int handshakeLength = McProtocol.tryReadVarInt(statusBuf);
+        if (handshakeLength < 0 || statusBuf.readableBytes() < handshakeLength) {
+            ctx.close();
+            return;
+        }
+        statusBuf.skipBytes(handshakeLength);
+
+        statusTimeout = ctx.executor().schedule(() -> {
+            ctx.close();
+        }, STATUS_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+        processStatus(ctx);
+    }
+
+    private void handleStatusInput(final ChannelHandlerContext ctx, final Object msg) {
+        try {
+            if (msg instanceof ByteBuf buf && statusBuf != null) {
+                statusBuf.writeBytes(buf);
+            }
+        } finally {
+            ReferenceCountUtil.release(msg);
+        }
+        processStatus(ctx);
+    }
+
+    private void processStatus(final ChannelHandlerContext ctx) {
+        while (statusBuf != null && !closed) {
+            final int length = McProtocol.tryReadVarInt(statusBuf);
+            if (length < 0) {
+                break; // incomplete
+            }
+            final int packetStart = statusBuf.readerIndex();
+            if (length < 1 || length > 16) {
+                ctx.close();
+                return;
+            }
+            if (statusBuf.readableBytes() < length) {
+                statusBuf.readerIndex(packetStart - McProtocol.varIntSize(length));
+                break;
+            }
+            final int packetId = McProtocol.tryReadVarInt(statusBuf);
+            if (packetId == 0x00 && length == 1 && !statusAnswered) {
+                statusAnswered = true;
+                final Integer protocol = ctx.channel().attr(MinecraftProtocolSniffer.ATTR_PROTOCOL_VERSION).get();
+                ctx.writeAndFlush(vc.status.response(statusDecision, protocol == null ? -1 : protocol, ctx.alloc()));
+            } else if (packetId == 0x01 && length == 9) {
+                ctx.writeAndFlush(McProtocol.pongPacket(ctx.alloc(), statusBuf.readLong()))
+                    .addListener(ChannelFutureListener.CLOSE);
+                return;
+            } else {
+                ctx.close();
+                return;
+            }
+        }
+        if (statusBuf != null) {
+            statusBuf.discardReadBytes();
+            if (statusBuf.readableBytes() > MAX_STATUS_BUFFER) {
+                ctx.close();
+            }
+        }
+    }
+
+    // =========================================================================
+    // Proxying
+    // =========================================================================
+
+    private void beginProxy(final ChannelHandlerContext ctx, final boolean honourOverride) {
+        mode = Mode.PROXY;
+        cfg = vc.config.get();
+        ctx.channel().config().setAutoRead(false);
+
+        // One-shot backend override set by the "send" console command.
+        final InetSocketAddress override = honourOverride ? vc.registry.pollNextBackend(clientIp) : null;
+        connect(ctx, override);
+    }
+
+    private void connect(final ChannelHandlerContext ctx, final InetSocketAddress override) {
+        final Channel inbound = ctx.channel();
+
+        final Backend chosen;
+        final String host;
+        final int port;
+        if (override != null) {
+            host = override.getHostString();
+            port = override.getPort();
+            chosen = vc.pool.find(host, port);
+            if (chosen != null) {
+                vc.pool.acquire(chosen);
+            }
+        } else {
+            chosen = vc.pool.select(clientIp, tried);
+            if (chosen == null) {
+                TerminalLogger.warn("No healthy backend available for " + clientIp
+                    + (tried.isEmpty() ? "" : " (after " + tried.size() + " failed attempt(s))"));
+                reject(ctx);
+                return;
+            }
+            host = chosen.host();
+            port = chosen.port();
+        }
+        held = chosen;
+        inbound.attr(ATTR_BACKEND).set(chosen != null ? chosen.name() : host + ":" + port);
+
+        final long startedAt = System.nanoTime();
+        final Bootstrap bootstrap = new Bootstrap()
+            .group(inbound.eventLoop())
+            .channel(NioSocketChannel.class)
+            .option(ChannelOption.TCP_NODELAY, true)
+            .option(ChannelOption.SO_KEEPALIVE, true)
+            .option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)
+            .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, cfg.connectTimeoutMs())
+            .handler(new ChannelInitializer<SocketChannel>() {
+                @Override
+                protected void initChannel(final SocketChannel ch) {
+                    if (cfg.proxyProtocol()) {
+                        ch.pipeline().addLast("proxy-protocol-v2", HAProxyMessageEncoder.INSTANCE);
+                    }
+                    ch.pipeline().addLast("backend-relay", new BackendRelayHandler(inbound));
+                }
+            });
+
+        final ChannelFuture connectFuture = bootstrap.connect(host, port);
+        outboundChannel = connectFuture.channel();
+
+        connectFuture.addListener((ChannelFutureListener) future -> {
+            if (closed) {
+                future.channel().close();
+                return;
+            }
+            if (!future.isSuccess()) {
+                onConnectFailed(ctx, chosen, override, host, port, future.cause());
+                return;
+            }
+            if (chosen != null) {
+                vc.pool.report(chosen, true, (System.nanoTime() - startedAt) / 1_000_000L);
+            }
+
+            final Channel outbound = future.channel();
+            if (cfg.proxyProtocol()) {
+                outbound.writeAndFlush(buildProxyV2Header(inbound, outbound)).addListener((ChannelFutureListener) write -> {
+                    if (!write.isSuccess()) {
+                        TerminalLogger.warn("Failed sending Proxy Protocol header for "
+                            + formatAddress(inbound.remoteAddress()));
+                        closeOnFlush(inbound);
+                        closeOnFlush(outbound);
+                        return;
+                    }
+                    if (outbound.pipeline().get("proxy-protocol-v2") != null) {
+                        outbound.pipeline().remove("proxy-protocol-v2");
+                    }
+                    onBackendReady(inbound, outbound);
+                });
+            } else {
+                onBackendReady(inbound, outbound);
+            }
+        });
+    }
+
+    private void onConnectFailed(
+        final ChannelHandlerContext ctx,
+        final Backend chosen,
+        final InetSocketAddress override,
+        final String host,
+        final int port,
+        final Throwable cause
+    ) {
+        final String reason = cause == null ? "unknown" : cause.getClass().getSimpleName() + ": " + cause.getMessage();
+        TerminalLogger.warn("Backend connection failed from " + formatAddress(ctx.channel().remoteAddress())
+            + " to " + host + ":" + port + " (" + reason + ")");
+        releaseHeld();
+        outboundChannel = null;
+
+        if (chosen != null) {
+            tried.add(chosen);
+            vc.pool.report(chosen, false, -1L);
+        }
+
+        attempts++;
+        if (override == null && attempts < cfg.backends().maxConnectAttempts()) {
+            connect(ctx, null); // fail over to another backend
+            return;
+        }
+        reject(ctx);
+    }
+
+    private void onBackendReady(final Channel inbound, final Channel outbound) {
+        if (closed) {
+            outbound.close();
+            return;
+        }
+        backendReady = true;
+        Object msg;
+        while ((msg = pending.poll()) != null) {
+            forward(inbound, outbound, msg);
+        }
+        pendingBytes = 0;
+        inbound.config().setAutoRead(true);
+    }
+
+    /** Closes the client, telling players in the login phase why instead of just dropping them. */
+    private void reject(final ChannelHandlerContext ctx) {
+        Metrics.INSTANCE.noBackendAvailable.increment();
+        releasePending();
+        final Integer nextState = ctx.channel().attr(MinecraftProtocolSniffer.ATTR_NEXT_STATE).get();
+        final String message = vc.config.get().status().offlineMotd();
+        if (nextState != null && (nextState == 2 || nextState == 3) && !message.isEmpty() && ctx.channel().isActive()) {
+            ctx.writeAndFlush(McProtocol.loginDisconnect(ctx.alloc(), message)).addListener(ChannelFutureListener.CLOSE);
+        } else {
+            closeOnFlush(ctx.channel());
+        }
+    }
+
+    private void forward(final Channel inbound, final Channel outbound, final Object msg) {
+        if (outbound == null || !outbound.isActive()) {
+            ReferenceCountUtil.release(msg);
+            return;
+        }
+        if (msg instanceof ByteBuf buf) {
+            Metrics.INSTANCE.bytesFromClients.add(buf.readableBytes());
+        }
+        outbound.writeAndFlush(msg).addListener((ChannelFutureListener) future -> {
+            if (!future.isSuccess()) {
+                closeOnFlush(outbound);
+                closeOnFlush(inbound);
+            }
+        });
+    }
+
+    // =========================================================================
+    // Helpers
+    // =========================================================================
+
+    private void queue(final Object msg) {
+        pending.add(msg);
+        if (msg instanceof ByteBuf buf) {
+            pendingBytes += buf.readableBytes();
+        }
+    }
+
+    private void releasePending() {
+        Object msg;
+        while ((msg = pending.poll()) != null) {
+            ReferenceCountUtil.release(msg);
+        }
+        pendingBytes = 0;
+    }
+
     private void releaseHeld() {
         final Backend backend = held;
         if (backend != null) {
             held = null;
             vc.pool.release(backend);
+        }
+    }
+
+    private static void cancel(final ScheduledFuture<?> future) {
+        if (future != null) {
+            future.cancel(false);
         }
     }
 

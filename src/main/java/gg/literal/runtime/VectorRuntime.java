@@ -41,10 +41,14 @@ public final class VectorRuntime {
         });
 
         final HealthChecker healthChecker = new HealthChecker(pool, holder, scheduler);
+        final StatusService statusService = new StatusService(pool, holder, scheduler);
         final ConnectionLimiter limiter = new ConnectionLimiter();
-        final VectorContext context = new VectorContext(holder, new ConnectionRegistry(), banList, whitelist, pool, limiter);
+        final VectorContext context = new VectorContext(
+            holder, new ConnectionRegistry(), banList, whitelist, pool, limiter, statusService);
 
         probeBackends(config, pool, healthChecker);
+
+        statusService.start();
         healthChecker.start();
         scheduler.scheduleWithFixedDelay(() -> {
             limiter.sweep(holder.get().limits().connectionRateWindowMs());
@@ -85,6 +89,7 @@ public final class VectorRuntime {
             TerminalLogger.fatal("Netty runtime failed: " + throwable.getMessage());
         } finally {
             healthChecker.stop();
+            statusService.stop();
             scheduler.shutdownNow();
             if (workerGroup != null) {
                 workerGroup.shutdownGracefully().syncUninterruptibly();

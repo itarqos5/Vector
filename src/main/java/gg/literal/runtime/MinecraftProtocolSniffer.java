@@ -34,6 +34,13 @@ public final class MinecraftProtocolSniffer extends ChannelDuplexHandler {
     public static final AttributeKey<Boolean> ATTR_COMPRESSION =
             AttributeKey.newInstance("vec-compression");
 
+    /**
+     * Handshake "next state" (1 = status, 2 = login, 3 = transfer). Set before the handshake bytes are
+     * forwarded; {@code 0} means the handshake could not be parsed; unset until a handshake was seen.
+     */
+    public static final AttributeKey<Integer> ATTR_NEXT_STATE =
+            AttributeKey.newInstance("vec-next-state");
+
     /** Username from Login Start, once validated. */
     public static final AttributeKey<String> ATTR_PLAYER_NAME =
             AttributeKey.newInstance("vec-player-name");
@@ -120,6 +127,7 @@ public final class MinecraftProtocolSniffer extends ChannelDuplexHandler {
     @Override
     public void exceptionCaught(final ChannelHandlerContext ctx, final Throwable cause) {
         // Stop sniffing on any pipeline error; let the real handler deal with it.
+        markHandshakeUnknown(ctx);
         state = State.IGNORED;
         outLoginPhase = false;
         accumulator.clear();
@@ -161,6 +169,7 @@ public final class MinecraftProtocolSniffer extends ChannelDuplexHandler {
                 try {
                     dispatch(packetId, ctx);
                 } catch (Exception ignored) {
+                    markHandshakeUnknown(ctx);
                     state = State.IGNORED;
                     accumulator.clear();
                     return;
@@ -184,6 +193,7 @@ public final class MinecraftProtocolSniffer extends ChannelDuplexHandler {
                     readString(accumulator);          // server address (discard)
                     accumulator.skipBytes(2);         // server port — unsigned short
                     final int nextState = readVarInt(accumulator);
+                    ctx.channel().attr(ATTR_NEXT_STATE).set(nextState >= 1 && nextState <= 3 ? nextState : 0);
                     state = switch (nextState) {
                         case 1 -> State.STATUS;
                         case 2, 3 -> { outLoginPhase = true; yield State.LOGIN; } // 3 = Transfer (1.20.5+)
@@ -253,6 +263,12 @@ public final class MinecraftProtocolSniffer extends ChannelDuplexHandler {
         TerminalLogger.warn("[WHITELIST] Refused " + name + " (" + clientIp + ")");
         final String message = config.get().access().whitelistMessage();
         ctx.writeAndFlush(McProtocol.loginDisconnect(ctx.alloc(), message)).addListener(ChannelFutureListener.CLOSE);
+    }
+
+    private static void markHandshakeUnknown(final ChannelHandlerContext ctx) {
+        if (ctx.channel().attr(ATTR_NEXT_STATE).get() == null) {
+            ctx.channel().attr(ATTR_NEXT_STATE).set(0);
+        }
     }
 
     private void tryParseOutbound(final ChannelHandlerContext ctx) {
