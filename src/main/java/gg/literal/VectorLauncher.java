@@ -20,6 +20,14 @@ public final class VectorLauncher {
     }
 
     public static void main(final String[] args) {
+        if (hasFlag(args, "--check-config")) {
+            System.exit(checkConfig(Path.of("config.json")));
+            return;
+        }
+        if (hasFlag(args, "--version")) {
+            System.out.println("Vector " + VectorInfo.version() + " (built " + VectorInfo.builtAt() + ")");
+            return;
+        }
         if (shouldSpawnWindowsConsole(args)) {
             if (spawnWindowsConsole()) {
                 return;
@@ -47,6 +55,37 @@ public final class VectorLauncher {
             TerminalLogger.fatal(ex.getMessage());
         } catch (Throwable throwable) {
             TerminalLogger.fatal("Unexpected bootstrap failure: " + throwable.getMessage());
+        }
+    }
+
+    private static boolean hasFlag(final String[] args, final String flag) {
+        for (final String arg : args) {
+            if (flag.equalsIgnoreCase(arg)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Validates config.json without starting anything, for deploy scripts and CI.
+     *
+     * @return process exit code: 0 if the file is valid, 1 otherwise
+     */
+    static int checkConfig(final Path path) {
+        if (java.nio.file.Files.notExists(path)) {
+            System.err.println(path + " does not exist; Vector would create a default one on first start.");
+            return 1;
+        }
+        try {
+            final VectorConfig config = VectorConfigLoader.load(path);
+            System.out.println(path + " is valid: " + config.backends().targets().size() + " backend(s), "
+                + config.backends().mode().id() + ", bind " + config.bindHost() + ":" + config.bindPort()
+                + (config.dashboard().enabled() ? ", dashboard on port " + config.dashboard().port() : ", dashboard off"));
+            return 0;
+        } catch (BootstrapException ex) {
+            System.err.println(ex.getMessage());
+            return 1;
         }
     }
 
