@@ -118,8 +118,10 @@ public record VectorConfig(
      *
      * @param logChat whether chat and commands are parsed and logged; turning it off lets the protocol sniffer
      *                stop inspecting packets once a player is in game, which saves CPU on busy offline-mode backends
+     * @param idleTimeoutSeconds close a connection that has sent nothing for this long (0 disables); real
+     *                           clients send keep-alives every few seconds, so silence means a dead peer
      */
-    public record Policy(boolean logChat) {
+    public record Policy(boolean logChat, int idleTimeoutSeconds) {
     }
 
     public static VectorConfig defaults() {
@@ -147,7 +149,7 @@ public record VectorConfig(
             new Access(false, "§cYou are not whitelisted on this server."),
             new Metrics(false, "127.0.0.1", 9100, ""),
             new Dashboard(true, "127.0.0.1", 3000, ""),
-            new Policy(true)
+            new Policy(true, 120)
         );
     }
 

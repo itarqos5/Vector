@@ -109,6 +109,7 @@ public final class MetricsServer {
         status(sb, "cache", m.statusFromCache.sum());
         status(sb, "offline", m.statusOffline.sum());
         status(sb, "backend", m.statusFromBackend.sum());
+        counter(sb, "vector_timeouts_total", "Connections closed for being idle or slow to handshake", m.timeouts.sum());
         counter(sb, "vector_no_backend_total", "Player connections dropped because no backend was available", m.noBackendAvailable.sum());
 
         sb.append("# HELP vector_backend_up 1 if the backend passes health checks\n# TYPE vector_backend_up gauge\n");

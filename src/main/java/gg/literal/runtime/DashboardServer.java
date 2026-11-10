@@ -380,6 +380,7 @@ public final class DashboardServer {
         totals.put("bytesFromClients", m.bytesFromClients.sum());
         totals.put("bytesToClients", m.bytesToClients.sum());
         totals.put("noBackend", m.noBackendAvailable.sum());
+        totals.put("timeouts", m.timeouts.sum());
         root.put("totals", totals);
 
         final Map<String, Object> blocked = new LinkedHashMap<>();
@@ -520,6 +521,7 @@ public final class DashboardServer {
         out.put("metrics-port", c.metrics().port());
         out.put("metrics-token", c.metrics().token().isEmpty() ? "(not set)" : "(set)");
         out.put("log-chat", c.policy().logChat());
+        out.put("idle-timeout-seconds", c.policy().idleTimeoutSeconds());
         out.put("dashboard-enabled", c.dashboard().enabled());
         out.put("dashboard-host", c.dashboard().host());
         out.put("dashboard-port", c.dashboard().port());

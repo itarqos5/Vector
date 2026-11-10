@@ -138,7 +138,8 @@ public final class VectorConfigLoader {
 
         final Policy dp = d.policy();
         final Policy policy = new Policy(
-            bool(root, "log-chat", dp.logChat())
+            bool(root, "log-chat", dp.logChat()),
+            intValue(root, "idle-timeout-seconds", dp.idleTimeoutSeconds(), 0, 86_400)
         );
 
         return new VectorConfig(
@@ -286,6 +287,7 @@ public final class VectorConfigLoader {
         line(sb, "metrics-port", d.metrics().port());
         line(sb, "metrics-token", Json.quote(d.metrics().token()));
         line(sb, "log-chat", d.policy().logChat());
+        line(sb, "idle-timeout-seconds", d.policy().idleTimeoutSeconds());
         line(sb, "dashboard-enabled", d.dashboard().enabled());
         line(sb, "dashboard-host", Json.quote(d.dashboard().host()));
         line(sb, "dashboard-port", d.dashboard().port());

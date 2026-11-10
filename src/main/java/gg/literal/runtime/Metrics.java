@@ -25,6 +25,9 @@ public final class Metrics {
 
     public final LongAdder noBackendAvailable = new LongAdder();
 
+    /** Connections closed for being idle or for not completing the handshake in time. */
+    public final LongAdder timeouts = new LongAdder();
+
     private Metrics() {
     }
 }

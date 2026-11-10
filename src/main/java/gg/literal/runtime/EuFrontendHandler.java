@@ -20,6 +20,8 @@ import io.netty.handler.codec.haproxy.HAProxyMessage;
 import io.netty.handler.codec.haproxy.HAProxyMessageEncoder;
 import io.netty.handler.codec.haproxy.HAProxyProxiedProtocol;
 import io.netty.handler.codec.haproxy.HAProxyProtocolVersion;
+import io.netty.handler.timeout.IdleState;
+import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.util.AttributeKey;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.ScheduledFuture;
@@ -142,6 +144,18 @@ public final class EuFrontendHandler extends ChannelInboundHandlerAdapter {
                 out.close(); // still connecting: abort
             }
         }
+    }
+
+    @Override
+    public void userEventTriggered(final ChannelHandlerContext ctx, final Object evt) throws Exception {
+        if (evt instanceof IdleStateEvent idle && idle.state() == IdleState.READER_IDLE) {
+            Metrics.INSTANCE.timeouts.increment();
+            TerminalLogger.warn("Closing idle connection from " + clientIp + " (no data for "
+                + vc.config.get().policy().idleTimeoutSeconds() + "s)");
+            ctx.close();
+            return;
+        }
+        ctx.fireUserEventTriggered(evt);
     }
 
     @Override

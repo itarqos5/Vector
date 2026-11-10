@@ -3,6 +3,9 @@ package gg.literal.runtime;
 import gg.literal.config.VectorConfig;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.socket.SocketChannel;
+import io.netty.handler.timeout.IdleStateHandler;
+
+import java.util.concurrent.TimeUnit;
 
 public final class SecurePipelineInitializer extends ChannelInitializer<SocketChannel> {
 
@@ -20,6 +23,9 @@ public final class SecurePipelineInitializer extends ChannelInitializer<SocketCh
         final VectorConfig config = context.config.get();
         channel.pipeline().addLast("ban-check", banCheckHandler);
         channel.pipeline().addLast("connection-limit", new ConnectionLimitHandler(context.limiter, context.config));
+        if (config.policy().idleTimeoutSeconds() > 0) {
+            channel.pipeline().addLast("idle", new IdleStateHandler(config.policy().idleTimeoutSeconds(), 0, 0, TimeUnit.SECONDS));
+        }
         channel.pipeline().addLast("mc-sniffer", new MinecraftProtocolSniffer(context.whitelist, context.config));
         channel.pipeline().addLast("packet-limiter", new PacketLimiterHandler(
             config.maxBytesPerSecond(),

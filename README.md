@@ -101,6 +101,7 @@ Older configs that only set `backend-host` / `backend-port` keep working as a si
 | `metrics-host` / `metrics-port` | `127.0.0.1` / `9100` | no | Where it listens. |
 | `metrics-token` | empty | yes | If set, `/metrics` and `/stats` require `Authorization: Bearer <token>`. |
 | `log-chat` | `true` | yes | Log chat and commands. Set `false` to stop parsing packets once a player is in game, which saves CPU on busy offline-mode backends (joins and leaves are still logged). |
+| `idle-timeout-seconds` | `120` | yes | Close a connection that has sent nothing for this long (new connections only). Clients send keep-alives every few seconds, so silence means a dead peer. `0` disables. |
 | `dashboard-enabled` | `true` | no | Start the web dashboard. |
 | `dashboard-host` / `dashboard-port` | `127.0.0.1` / `3000` | no | Where the dashboard listens. Use `0.0.0.0` to reach it from other machines. |
 | `dashboard-password` | empty | no | Password for the dashboard. See [Dashboard](#dashboard). |
