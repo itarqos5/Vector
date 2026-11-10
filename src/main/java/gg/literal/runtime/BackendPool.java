@@ -40,9 +40,9 @@ public final class BackendPool {
         for (final VectorConfig.BackendTarget target : settings.targets()) {
             Backend backend = existing.get(key(target.host(), target.port()));
             if (backend == null) {
-                backend = new Backend(target.name(), target.host(), target.port(), target.weight());
+                backend = new Backend(target.name(), target.host(), target.port(), target.weight(), target.maxConnections());
             } else {
-                backend.update(target.name(), target.weight());
+                backend.update(target.name(), target.weight(), target.maxConnections());
             }
             next.add(backend);
         }
@@ -127,7 +127,7 @@ public final class BackendPool {
     }
 
     private static boolean usable(final Backend backend, final Set<Backend> excluded) {
-        return backend.available() && (excluded.isEmpty() || !excluded.contains(backend));
+        return backend.available() && backend.hasCapacity() && (excluded.isEmpty() || !excluded.contains(backend));
     }
 
     /** The {@code index}-th usable backend in configuration order (no intermediate list is allocated). */

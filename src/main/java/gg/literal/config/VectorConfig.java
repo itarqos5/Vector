@@ -25,8 +25,17 @@ public record VectorConfig(
     Policy policy
 ) {
 
-    /** A single upstream server. */
-    public record BackendTarget(String name, String host, int port, int weight) {
+    /**
+     * A single upstream server.
+     *
+     * @param maxConnections cap on simultaneous player connections to this backend (0 = unlimited); once it is
+     *                       reached new players go to the other backends
+     */
+    public record BackendTarget(String name, String host, int port, int weight, int maxConnections) {
+
+        public BackendTarget(final String name, final String host, final int port, final int weight) {
+            this(name, host, port, weight, 0);
+        }
         public String address() {
             return host + ":" + port;
         }
@@ -127,6 +136,7 @@ public record VectorConfig(
      *                    join)
      * @param maintenanceMessage disconnect text shown to refused players
      * @param maintenanceMotd MOTD shown in the server list while maintenance mode is on
+     * @param fullMessage disconnect text when every available backend is at its max-connections cap
      */
     public record Policy(
         boolean logChat,
@@ -135,7 +145,8 @@ public record VectorConfig(
         int maxConnections,
         boolean maintenance,
         String maintenanceMessage,
-        String maintenanceMotd
+        String maintenanceMotd,
+        String fullMessage
     ) {
     }
 
@@ -164,7 +175,8 @@ public record VectorConfig(
             new Access(false, "§cYou are not whitelisted on this server."),
             new Metrics(false, "127.0.0.1", 9100, ""),
             new Dashboard(true, "127.0.0.1", 3000, ""),
-            new Policy(true, 120, 5000, 0, false, "\u00a7eThe server is under maintenance. Please try again later.", "\u00a76Under maintenance")
+            new Policy(true, 120, 5000, 0, false, "\u00a7eThe server is under maintenance. Please try again later.", "\u00a76Under maintenance",
+                "\u00a7cAll servers are full right now. Please try again shortly.")
         );
     }
 

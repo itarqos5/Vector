@@ -152,6 +152,28 @@ class BackendPoolTest {
     }
 
     @Test
+    void fullBackendsOverflowToTheOthers() {
+        final BackendPool p = pool(BalanceMode.ROUND_ROBIN, 2,
+            new gg.literal.config.VectorConfig.BackendTarget("small", "127.0.0.1", 1, 1, 2),
+            TestConfigs.target("big", 2, 1));
+        final Map<String, Integer> counts = new LinkedHashMap<>();
+        for (int i = 0; i < 10; i++) { // never released, so the 'small' cap of 2 is eventually hit
+            counts.merge(p.select("1.1.1.1", Set.of()).name(), 1, Integer::sum);
+        }
+        assertEquals(2, counts.get("small"));
+        assertEquals(8, counts.get("big"));
+    }
+
+    @Test
+    void returnsNullWhenEveryBackendIsFull() {
+        final BackendPool p = pool(BalanceMode.ROUND_ROBIN, 2,
+            new gg.literal.config.VectorConfig.BackendTarget("only", "127.0.0.1", 1, 1, 1));
+        assertSame(p.findByName("only"), p.select("1.1.1.1", Set.of()));
+        assertNull(p.select("1.1.1.1", Set.of()));
+        assertEquals(1, p.availableCount(), "a full backend is still up, which is what the full message keys on");
+    }
+
+    @Test
     void markInitialAppliesImmediately() {
         final BackendPool p = pool(BalanceMode.ROUND_ROBIN, 5, TestConfigs.target("a", 1, 1));
         final Backend a = p.findByName("a");

@@ -144,7 +144,8 @@ public final class VectorConfigLoader {
             intValue(root, "max-connections", dp.maxConnections(), 0, Integer.MAX_VALUE),
             bool(root, "maintenance-enabled", dp.maintenance()),
             string(root, "maintenance-message", dp.maintenanceMessage()),
-            string(root, "maintenance-motd", dp.maintenanceMotd())
+            string(root, "maintenance-motd", dp.maintenanceMotd()),
+            string(root, "full-message", dp.fullMessage())
         );
 
         return new VectorConfig(
@@ -196,7 +197,8 @@ public final class VectorConfigLoader {
             if (!names.add(name.toLowerCase())) {
                 throw new IllegalArgumentException("duplicate backend name \"" + name + "\"");
             }
-            final BackendTarget target = new BackendTarget(name, host.trim(), port, weight);
+            final int maxConnections = intValue(entry, "max-connections", 0, 0, Integer.MAX_VALUE);
+            final BackendTarget target = new BackendTarget(name, host.trim(), port, weight, maxConnections);
             if (!addresses.add(target.address().toLowerCase())) {
                 throw new IllegalArgumentException("duplicate backend address " + target.address());
             }
@@ -298,6 +300,7 @@ public final class VectorConfigLoader {
         line(sb, "maintenance-enabled", d.policy().maintenance());
         line(sb, "maintenance-message", Json.quote(d.policy().maintenanceMessage()));
         line(sb, "maintenance-motd", Json.quote(d.policy().maintenanceMotd()));
+        line(sb, "full-message", Json.quote(d.policy().fullMessage()));
         line(sb, "dashboard-enabled", d.dashboard().enabled());
         line(sb, "dashboard-host", Json.quote(d.dashboard().host()));
         line(sb, "dashboard-port", d.dashboard().port());

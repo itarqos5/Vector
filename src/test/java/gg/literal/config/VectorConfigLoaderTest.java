@@ -75,6 +75,18 @@ class VectorConfigLoaderTest {
     }
 
     @Test
+    void readsPerBackendConnectionCaps() throws Exception {
+        final VectorConfig cfg = load("""
+            {"backends": [
+               {"name": "a", "host": "h1", "port": 1000, "max-connections": 80},
+               {"name": "b", "host": "h2", "port": 2000}
+            ]}
+            """);
+        assertEquals(80, cfg.backends().targets().get(0).maxConnections());
+        assertEquals(0, cfg.backends().targets().get(1).maxConnections());
+    }
+
+    @Test
     void reportsUnknownBalanceModes() throws Exception {
         assertTrue(failure("{\"balance-mode\": \"fastest\"}").contains("balance-mode"));
     }

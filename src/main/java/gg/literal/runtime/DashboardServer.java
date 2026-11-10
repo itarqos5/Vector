@@ -405,6 +405,7 @@ public final class DashboardServer {
             entry.put("name", b.name());
             entry.put("address", b.address());
             entry.put("weight", b.weight());
+            entry.put("maxConnections", b.maxConnections());
             entry.put("healthy", b.healthy());
             entry.put("draining", b.draining());
             entry.put("active", b.activeConnections());
@@ -496,6 +497,7 @@ public final class DashboardServer {
             entry.put("host", t.host());
             entry.put("port", t.port());
             entry.put("weight", t.weight());
+            entry.put("max-connections", t.maxConnections());
             backends.add(entry);
         }
         out.put("backends", backends);
@@ -529,6 +531,7 @@ public final class DashboardServer {
         out.put("maintenance-enabled", c.policy().maintenance());
         out.put("maintenance-message", c.policy().maintenanceMessage());
         out.put("maintenance-motd", c.policy().maintenanceMotd());
+        out.put("full-message", c.policy().fullMessage());
         out.put("handshake-timeout-ms", c.policy().handshakeTimeoutMs());
         out.put("dashboard-enabled", c.dashboard().enabled());
         out.put("dashboard-host", c.dashboard().host());

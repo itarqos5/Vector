@@ -432,7 +432,10 @@ public final class EuFrontendHandler extends ChannelInboundHandlerAdapter {
         Metrics.INSTANCE.noBackendAvailable.increment();
         releasePending();
         final Integer nextState = ctx.channel().attr(MinecraftProtocolSniffer.ATTR_NEXT_STATE).get();
-        final String message = vc.config.get().status().offlineMotd();
+        // "Everything is full" deserves a different message than "everything is down".
+        final String message = vc.pool.availableCount() > 0
+            ? vc.config.get().policy().fullMessage()
+            : vc.config.get().status().offlineMotd();
         if (nextState != null && (nextState == 2 || nextState == 3) && !message.isEmpty() && ctx.channel().isActive()) {
             ctx.writeAndFlush(McProtocol.loginDisconnect(ctx.alloc(), message)).addListener(ChannelFutureListener.CLOSE);
         } else {

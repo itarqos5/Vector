@@ -10,6 +10,7 @@ public final class Backend {
     private final int port;
     private volatile String name;
     private volatile int weight;
+    private volatile int maxConnections;
 
     private volatile boolean healthy = true;
     private volatile boolean draining;
@@ -24,11 +25,12 @@ public final class Backend {
     /** Smooth weighted round-robin accumulator; only touched while holding the pool's weighted lock. */
     int currentWeight;
 
-    Backend(final String name, final String host, final int port, final int weight) {
+    Backend(final String name, final String host, final int port, final int weight, final int maxConnections) {
         this.name = name;
         this.host = host;
         this.port = port;
         this.weight = weight;
+        this.maxConnections = maxConnections;
     }
 
     public String name() {
@@ -64,6 +66,17 @@ public final class Backend {
         this.draining = value;
     }
 
+    /** Configured cap on simultaneous player connections, or 0 for unlimited. */
+    public int maxConnections() {
+        return maxConnections;
+    }
+
+    /** False once the connection cap is reached. */
+    public boolean hasCapacity() {
+        final int cap = maxConnections;
+        return cap <= 0 || activeConnections.get() < cap;
+    }
+
     /** Healthy and not draining: eligible for new players. */
     public boolean available() {
         return healthy && !draining;
@@ -90,9 +103,10 @@ public final class Backend {
         return lastCheckMillis;
     }
 
-    void update(final String newName, final int newWeight) {
+    void update(final String newName, final int newWeight, final int newMaxConnections) {
         this.name = newName;
         this.weight = newWeight;
+        this.maxConnections = newMaxConnections;
     }
 
     void setHealthy(final boolean value) {
