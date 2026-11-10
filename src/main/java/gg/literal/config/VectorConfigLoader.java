@@ -152,7 +152,10 @@ public final class VectorConfigLoader {
             intValue(root, "min-protocol", dp.minProtocol(), 0, Integer.MAX_VALUE),
             intValue(root, "max-protocol", dp.maxProtocol(), 0, Integer.MAX_VALUE),
             string(root, "protocol-message", dp.protocolMessage()),
-            stringList(root, "allowed-hosts", dp.allowedHosts())
+            stringList(root, "allowed-hosts", dp.allowedHosts()),
+            intValue(root, "auto-ban-violations", dp.autoBanViolations(), 0, 1_000_000),
+            intValue(root, "auto-ban-window-seconds", dp.autoBanWindowSeconds(), 1, 86_400),
+            intValue(root, "auto-ban-minutes", dp.autoBanMinutes(), 1, 525_600)
         );
         if (policy.maxProtocol() != 0 && policy.minProtocol() > policy.maxProtocol()) {
             throw new IllegalArgumentException("min-protocol (" + policy.minProtocol()
@@ -393,6 +396,9 @@ public final class VectorConfigLoader {
         line(sb, "max-protocol", d.policy().maxProtocol());
         line(sb, "protocol-message", Json.quote(d.policy().protocolMessage()));
         line(sb, "allowed-hosts", Json.write(d.policy().allowedHosts()));
+        line(sb, "auto-ban-violations", d.policy().autoBanViolations());
+        line(sb, "auto-ban-window-seconds", d.policy().autoBanWindowSeconds());
+        line(sb, "auto-ban-minutes", d.policy().autoBanMinutes());
         line(sb, "dashboard-enabled", d.dashboard().enabled());
         line(sb, "dashboard-host", Json.quote(d.dashboard().host()));
         line(sb, "dashboard-port", d.dashboard().port());

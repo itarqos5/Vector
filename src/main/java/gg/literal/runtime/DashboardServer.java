@@ -381,6 +381,7 @@ public final class DashboardServer {
         totals.put("bytesToClients", m.bytesToClients.sum());
         totals.put("noBackend", m.noBackendAvailable.sum());
         totals.put("timeouts", m.timeouts.sum());
+        totals.put("autoBans", m.autoBans.sum());
         root.put("totals", totals);
 
         final Map<String, Object> blocked = new LinkedHashMap<>();
@@ -546,6 +547,9 @@ public final class DashboardServer {
         out.put("min-protocol", c.policy().minProtocol());
         out.put("max-protocol", c.policy().maxProtocol());
         out.put("protocol-message", c.policy().protocolMessage());
+        out.put("auto-ban-violations", c.policy().autoBanViolations());
+        out.put("auto-ban-window-seconds", c.policy().autoBanWindowSeconds());
+        out.put("auto-ban-minutes", c.policy().autoBanMinutes());
         out.put("allowed-hosts", c.policy().allowedHosts().isEmpty() ? "(any)" : String.join(", ", c.policy().allowedHosts()));
         out.put("handshake-timeout-ms", c.policy().handshakeTimeoutMs());
         out.put("dashboard-enabled", c.dashboard().enabled());

@@ -29,6 +29,9 @@ public final class Metrics {
 
     public final LongAdder noBackendAvailable = new LongAdder();
 
+    /** IPs banned automatically after repeated violations. */
+    public final LongAdder autoBans = new LongAdder();
+
     /** Connections closed for being idle or for not completing the handshake in time. */
     public final LongAdder timeouts = new LongAdder();
 

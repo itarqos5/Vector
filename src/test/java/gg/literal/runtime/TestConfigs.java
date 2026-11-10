@@ -21,6 +21,19 @@ final class TestConfigs {
             d.status(), d.access(), d.metrics(), d.dashboard(), d.policy());
     }
 
+    /** Defaults with the auto-ban threshold replaced (the one place that spells out every Policy field). */
+    static VectorConfig withAutoBan(final int violations) {
+        final VectorConfig d = VectorConfig.defaults();
+        final VectorConfig.Policy p = d.policy();
+        final VectorConfig.Policy policy = new VectorConfig.Policy(p.logChat(), p.idleTimeoutSeconds(),
+            p.handshakeTimeoutMs(), p.maxConnections(), p.maintenance(), p.maintenanceMessage(), p.maintenanceMotd(),
+            p.fullMessage(), p.minProtocol(), p.maxProtocol(), p.protocolMessage(), p.allowedHosts(),
+            violations, p.autoBanWindowSeconds(), p.autoBanMinutes());
+        return new VectorConfig(d.bindHost(), d.bindPort(), d.bossThreads(), d.workerThreads(),
+            d.maxBytesPerSecond(), d.maxPacketsPerSecond(), d.connectTimeoutMs(), d.proxyProtocol(), d.backends(),
+            d.limits(), d.status(), d.access(), d.metrics(), d.dashboard(), policy);
+    }
+
     static BackendTarget target(final String name, final int port, final int weight) {
         return new BackendTarget(name, "127.0.0.1", port, weight);
     }

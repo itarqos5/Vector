@@ -177,6 +177,9 @@ public record VectorConfig(
      * @param protocolMessage disconnect text for clients outside the accepted range
      * @param allowedHosts host names clients must have connected with (empty = any); connections using another
      *                     name, including a bare IP, are dropped silently, which shuts out most scanners
+     * @param autoBanViolations ban an IP after this many violations inside the window (0 = never)
+     * @param autoBanWindowSeconds length of the violation window
+     * @param autoBanMinutes how long an automatic ban lasts
      */
     public record Policy(
         boolean logChat,
@@ -190,7 +193,10 @@ public record VectorConfig(
         int minProtocol,
         int maxProtocol,
         String protocolMessage,
-        List<String> allowedHosts
+        List<String> allowedHosts,
+        int autoBanViolations,
+        int autoBanWindowSeconds,
+        int autoBanMinutes
     ) {
     }
 
@@ -223,7 +229,7 @@ public record VectorConfig(
             new Dashboard(true, "127.0.0.1", 3000, ""),
             new Policy(true, 120, 5000, 0, false, "\u00a7eThe server is under maintenance. Please try again later.", "\u00a76Under maintenance",
                 "\u00a7cAll servers are full right now. Please try again shortly.",
-                0, 0, "\u00a7cYour Minecraft version is not supported on this server.", List.of())
+                0, 0, "\u00a7cYour Minecraft version is not supported on this server.", List.of(), 0, 60, 30)
         );
     }
 

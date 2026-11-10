@@ -111,6 +111,7 @@ Older configs that only set `backend-host` / `backend-port` keep working as a si
 | `maintenance-motd` | `§6Under maintenance` | yes | MOTD shown in the server list while maintenance mode is on. |
 | `min-protocol` / `max-protocol` | `0` / `0` | yes | Accepted client protocol range at login (`0` = unbounded), e.g. `767` is Minecraft 1.21.1. Players outside it are refused with `protocol-message`. |
 | `allowed-hosts` | `[]` | yes | Host names clients must connect with (exact, `*.example.com` or `*`). Connections using another name, including a bare IP, are dropped silently, which shuts out most scanners and bots. Empty = accept any. |
+| `auto-ban-violations` | `0` | yes | Ban an IP automatically after this many violations (connection-rate hits, packet floods, refused host names) inside `auto-ban-window-seconds` (default `60`) for `auto-ban-minutes` (default `30`). `0` = off. |
 | `dashboard-enabled` | `true` | no | Start the web dashboard. |
 | `dashboard-host` / `dashboard-port` | `127.0.0.1` / `3000` | no | Where the dashboard listens. Use `0.0.0.0` to reach it from other machines. |
 | `dashboard-password` | empty | no | Password for the dashboard. See [Dashboard](#dashboard). |
