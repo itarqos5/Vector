@@ -26,7 +26,7 @@ public final class VectorLauncher {
             }
         }
 
-        TerminalLogger.info("Starting Vector bootstrap sequence...");
+        TerminalLogger.info("Starting Vector " + VectorInfo.version() + " (built " + VectorInfo.builtAt() + ")...");
 
         try {
             TerminalLogger.info("Phase 1/3: EULA verification");

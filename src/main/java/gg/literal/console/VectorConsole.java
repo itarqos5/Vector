@@ -1,5 +1,6 @@
 package gg.literal.console;
 
+import gg.literal.VectorInfo;
 import gg.literal.bootstrap.BootstrapException;
 import gg.literal.log.TerminalLogger;
 import gg.literal.runtime.Backend;
@@ -84,6 +85,8 @@ public final class VectorConsole {
             case "backends" -> backends();
             case "reload" -> reload();
             case "stats" -> stats();
+            case "version" -> TerminalLogger.info("Vector " + VectorInfo.version() + " (built " + VectorInfo.builtAt()
+                + ", Java " + System.getProperty("java.version") + ")");
 
             case "stop" -> {
                 TerminalLogger.info("Stopping Vector...");
@@ -302,6 +305,7 @@ public final class VectorConsole {
         TerminalLogger.info("  list                          - list active connections (player, backend)");
         TerminalLogger.info("  backends                      - show backend health, load and latency");
         TerminalLogger.info("  stats                         - traffic, blocks and status ping counters");
+        TerminalLogger.info("  version                       - show the Vector and Java versions");
         TerminalLogger.info("  reload                        - reload config.json and whitelist.txt without restarting");
         TerminalLogger.info("  kick <ip>                     - disconnect a player by IP");
         TerminalLogger.info("  send <ip> <backend>           - disconnect and route the next login to a named backend");
