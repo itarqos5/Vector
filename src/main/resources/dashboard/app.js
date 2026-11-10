@@ -16,6 +16,7 @@
     logSeq: 0,
     activity: [],
     activitySeq: 0,
+    playerSort: { key: 'since', dir: -1 }, // newest connection first by default
     tab: 'overview',
     timer: null,
     authRequired: false,
@@ -609,6 +610,11 @@
     const filter = $('playerFilter').value.trim().toLowerCase();
     const rows = d.connections.filter((c) => !filter
       || `${c.player || ''} ${c.ip} ${c.backend || ''}`.toLowerCase().includes(filter));
+    sortPlayers(rows);
+    for (const th of table.querySelectorAll('th[aria-sort]')) {
+      const key = th.querySelector('button.sort').dataset.sort;
+      th.setAttribute('aria-sort', key === state.playerSort.key ? (state.playerSort.dir > 0 ? 'ascending' : 'descending') : 'none');
+    }
 
     $('playerCount').textContent = `${rows.length} of ${d.totals.connectionsActive} connection${d.totals.connectionsActive === 1 ? '' : 's'}`;
     const body = table.querySelector('tbody');
@@ -634,6 +640,7 @@
         h('td', { class: 'mono', text: `${c.ip}:${c.port}` }),
         h('td', { text: c.backend || '–' }),
         h('td', { class: 'mono', text: fmtDuration(d.now - c.since) }),
+        h('td', { class: 'mono', text: `${fmtBytes(c.bytesIn)} / ${fmtBytes(c.bytesOut)}` }),
         h('td', { class: 'mono', text: c.protocol != null ? String(c.protocol) : '–' }),
         h('td', null, h('div', { class: 'row-actions' },
           d.backends.length > 1 ? send : null,
@@ -641,6 +648,32 @@
           h('button', { class: 'ghost small-btn', text: 'Ban…', onclick: () => openBanDialog(c) })))));
     }
   }
+
+  /** Sorts connection rows in place by the column chosen in the header (names and backends case-insensitively). */
+  function sortPlayers(rows) {
+    const { key, dir } = state.playerSort;
+    const value = (c) => {
+      switch (key) {
+        case 'player': return (c.player || '').toLowerCase();
+        case 'ip': return c.ip;
+        case 'backend': return (c.backend || '').toLowerCase();
+        case 'traffic': return c.bytesIn + c.bytesOut;
+        default: return -c.since; // 'since': smaller timestamp = older = longer connected
+      }
+    };
+    rows.sort((a, b) => {
+      const x = value(a), y = value(b);
+      return (x < y ? -1 : x > y ? 1 : 0) * dir;
+    });
+  }
+
+  $('playersTable').querySelector('thead').addEventListener('click', (event) => {
+    const button = event.target.closest('button.sort');
+    if (!button) return;
+    const key = button.dataset.sort;
+    state.playerSort = { key, dir: state.playerSort.key === key ? -state.playerSort.dir : 1 };
+    if (state.data) renderPlayers(state.data, true);
+  });
 
   $('playerFilter').addEventListener('input', () => {
     prefs.set('playerFilter', $('playerFilter').value);

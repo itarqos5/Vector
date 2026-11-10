@@ -113,7 +113,15 @@
       <div class="card flush">
         <div class="table-wrap">
           <table class="data" id="playersTable">
-            <thead><tr><th>Player</th><th>Address</th><th>Backend</th><th>Connected</th><th>Protocol</th><th class="actions-col">Actions</th></tr></thead>
+            <thead><tr>
+              <th aria-sort="none"><button class="sort" data-sort="player">Player</button></th>
+              <th aria-sort="none"><button class="sort" data-sort="ip">Address</button></th>
+              <th aria-sort="none"><button class="sort" data-sort="backend">Backend</button></th>
+              <th aria-sort="none"><button class="sort" data-sort="since">Connected</button></th>
+              <th aria-sort="none"><button class="sort" data-sort="traffic">Traffic in / out</button></th>
+              <th>Protocol</th>
+              <th class="actions-col">Actions</th>
+            </tr></thead>
             <tbody></tbody>
           </table>
         </div>
