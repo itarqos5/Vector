@@ -47,6 +47,17 @@
     </div>
   </header>
 
+  <div id="banners" class="banners" aria-live="polite">
+    <div id="maintenanceBanner" class="banner banner-warn" hidden>
+      <span><strong>Maintenance mode is on.</strong> Only whitelisted players can join and the server list shows the maintenance message.</span>
+      <button id="maintenanceOff" class="ghost small-btn" type="button">Turn off</button>
+    </div>
+    <div id="backendBanner" class="banner banner-bad" hidden>
+      <span id="backendBannerText"></span>
+      <button id="backendBannerGo" class="ghost small-btn" type="button">View backends</button>
+    </div>
+  </div>
+
   <main class="page">
 
     <!-- Overview -->

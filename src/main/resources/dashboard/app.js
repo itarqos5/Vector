@@ -279,6 +279,7 @@
 
     $('bindLabel').textContent = d.bind;
     updateTitle(d);
+    renderBanners(d);
     renderOverview(d);
     if (state.tab === 'players') renderPlayers(d);
     if (state.tab === 'backends') renderBackends(d);
@@ -294,6 +295,31 @@
     else if (down) prefix = `(${d.totals.connectionsActive}, ${down} down)`;
     document.title = `${prefix} Vector dashboard`;
   }
+
+  /** Persistent notices that should be visible on every tab: maintenance mode and backend trouble. */
+  function renderBanners(d) {
+    $('maintenanceBanner').hidden = !d.maintenance;
+
+    const down = d.backends.filter((b) => !b.healthy);
+    const available = d.backends.filter((b) => b.healthy && !b.draining);
+    const banner = $('backendBanner');
+    if (!d.backends.length || (!down.length && available.length)) {
+      banner.hidden = true;
+      return;
+    }
+    banner.hidden = false;
+    if (!available.length) {
+      $('backendBannerText').textContent = 'No backend can take new players right now. Joining players are refused and the server list shows the offline message.';
+    } else {
+      const names = down.map((b) => b.name).join(', ');
+      $('backendBannerText').textContent = `${down.length} of ${d.backends.length} backends ${down.length === 1 ? 'is' : 'are'} down: ${names}. Players are being sent to the others.`;
+    }
+  }
+
+  $('maintenanceOff').addEventListener('click', () => {
+    act({ action: 'setting', key: 'maintenance-enabled', value: false }, 'Maintenance mode is off.');
+  });
+  $('backendBannerGo').addEventListener('click', () => selectTab('backends'));
 
   // ------------------------------------------------------------------ tabs
 

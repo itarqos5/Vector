@@ -407,6 +407,7 @@ public final class DashboardServer {
         root.put("bind", cfg.bindHost() + ":" + cfg.bindPort());
         root.put("balanceMode", ctx.pool.mode().id());
         root.put("proxyProtocol", cfg.proxyProtocol());
+        root.put("maintenance", cfg.policy().maintenance());
 
         final Map<String, Object> totals = new LinkedHashMap<>();
         totals.put("connectionsActive", ctx.registry.size());
