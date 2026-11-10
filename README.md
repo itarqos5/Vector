@@ -175,22 +175,28 @@ Auto-ban counts three kinds of violation per IP: hitting the connection-rate lim
 
 ## Dashboard
 
-Open `http://localhost:3000` (change it with `dashboard-port`). It updates every two seconds and has six tabs:
+Open `http://localhost:3000` (change it with `dashboard-port`). It updates every two seconds, shows the number of players in the browser tab title, and has seven tabs:
 
-- **Overview** — a live map of players flowing through Vector to each backend (link width follows open connections, red means down), key figures, and ten-minute charts of connections, throughput and events per second.
-- **Players** — every open connection with player name, backend and protocol; kick, ban or send to another backend.
-- **Backends** — health, weight, open and total connections, failed connects and probe latency.
+- **Overview** — a live map of players flowing through Vector to each backend (link width follows open connections; amber dashes mean draining, red means down), key figures (players online with the peak, traffic, pings answered by Vector, every refusal reason), and ten-minute charts of connections, throughput and events per second.
+- **Players** — every open connection with player name, backend, session length and bytes each way. Sort by any column, filter, **Export CSV**, kick, ban, send to another backend, **Move players…** between backends or **Disconnect everyone**.
+- **Backends** — health, weight, open connections against the cap, totals, failed connects and probe latency, with **Drain / Resume** buttons.
+- **Activity** — a live feed of joins, leaves, refusals, auto-bans, backend up/down and admin actions.
 - **Access** — add and remove bans (with duration and reason) and whitelist entries.
-- **Logs** — the console log with level and text filters.
-- **Config** — the active settings (secrets are only shown as set or not set) and a **Reload config.json** button.
+- **Logs** — the console log with level and text filters, **Pause**, **Copy** and **Download**.
+- **Config** — the active settings (secrets are only shown as set or not set). Settings that are safe to change live (maintenance mode, whitelist, messages, balance mode, limits, status cache, auto-ban...) have inline controls; there is also a **Reload config.json** button.
+
+Banners under the header warn when maintenance mode is on (with a one-click *Turn off*) and when backends are down. Press `?` for keyboard shortcuts; the theme can be set to light, dark or auto. Your filters and theme are remembered in the browser.
 
 Access and security:
 
 - By default the dashboard listens on `127.0.0.1` with no password, and refuses requests whose `Host` header is not `localhost`, `127.0.0.1` or `::1` (this blocks DNS-rebinding attacks).
 - To use it remotely set `dashboard-host` (for example `0.0.0.0`) **and** `dashboard-password`. If you bind a non-loopback address without a password, Vector generates a random password for that run and prints it in the console.
 - With a password, sign-in creates a 12 hour `HttpOnly`, `SameSite=Strict` session. Five wrong passwords lock that IP out for a minute. Scripts can send `Authorization: Bearer <password>` instead.
-- Every change (kick, ban, whitelist, reload) needs a same-origin request carrying an `X-Requested-With` header, and is written to the console log as `[DASHBOARD]`.
+- Every change (kick, ban, whitelist, drain, settings, reload) needs a same-origin request carrying an `X-Requested-With` header, is written to the console log as `[DASHBOARD]` and appears in the Activity tab.
+- Only an explicit allow-list of reloadable settings can be edited from the dashboard. Ports, hosts, passwords, tokens and the webhook URL cannot.
 - The dashboard speaks plain HTTP. For access over the internet put it behind a reverse proxy that terminates HTTPS.
+
+To try the UI without a real network, run the mock-traffic demo: `java tests/e2e/Demo.java demo target/vector-1.0.0-SNAPSHOT.jar - 600` and open `http://localhost:3000`.
 
 ## Metrics
 
