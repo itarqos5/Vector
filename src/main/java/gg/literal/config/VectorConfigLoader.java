@@ -83,14 +83,16 @@ public final class VectorConfigLoader {
         } else {
             mode = db.mode();
         }
+        final List<BackendTarget> targets = readBackends(root, d);
         final Backends backends = new Backends(
-            readBackends(root, d),
+            targets,
             mode,
             intValue(root, "health-check-interval-ms", db.healthIntervalMs(), 250, 3_600_000),
             intValue(root, "health-check-timeout-ms", db.healthTimeoutMs(), 100, 600_000),
             intValue(root, "health-check-failures", db.healthFailThreshold(), 1, 1000),
             intValue(root, "max-connect-attempts", db.maxConnectAttempts(), 1, 32),
-            healthMode(root, db.healthMode())
+            healthMode(root, db.healthMode()),
+            readRoutes(root, targets)
         );
 
         final Limits dl = d.limits();
@@ -220,6 +222,52 @@ public final class VectorConfigLoader {
             throw new IllegalArgumentException("\"" + key + "\" must be a string");
         }
         return s;
+    }
+
+    /** Reads the optional {@code routes} array and checks that every route points at configured backends. */
+    private static List<VectorConfig.Route> readRoutes(final Map<String, Object> root, final List<BackendTarget> targets) {
+        final Object raw = root.get("routes");
+        if (raw == null) {
+            return List.of();
+        }
+        if (!(raw instanceof List<?> list)) {
+            throw new IllegalArgumentException("\"routes\" must be an array");
+        }
+        final Set<String> known = new HashSet<>();
+        for (final BackendTarget target : targets) {
+            known.add(target.name().toLowerCase());
+        }
+
+        final List<VectorConfig.Route> routes = new ArrayList<>();
+        final Set<String> hosts = new HashSet<>();
+        int index = 0;
+        for (final Object element : list) {
+            if (!(element instanceof Map<?, ?> rawEntry)) {
+                throw new IllegalArgumentException("routes[" + index + "] must be an object");
+            }
+            @SuppressWarnings("unchecked")
+            final Map<String, Object> entry = (Map<String, Object>) rawEntry;
+            final String host = string(entry, "host", "").trim().toLowerCase();
+            if (host.isEmpty()) {
+                throw new IllegalArgumentException("routes[" + index + "] is missing \"host\"");
+            }
+            if (!hosts.add(host)) {
+                throw new IllegalArgumentException("duplicate route for host \"" + host + "\"");
+            }
+            if (!(entry.get("backends") instanceof List<?> names) || names.isEmpty()) {
+                throw new IllegalArgumentException("route \"" + host + "\" needs a non-empty \"backends\" array");
+            }
+            final List<String> backendNames = new ArrayList<>();
+            for (final Object name : names) {
+                if (!(name instanceof String s) || !known.contains(s.trim().toLowerCase())) {
+                    throw new IllegalArgumentException("route \"" + host + "\" references unknown backend " + name);
+                }
+                backendNames.add(s.trim());
+            }
+            routes.add(new VectorConfig.Route(host, List.copyOf(backendNames)));
+            index++;
+        }
+        return List.copyOf(routes);
     }
 
     private static VectorConfig.HealthMode healthMode(final Map<String, Object> root, final VectorConfig.HealthMode fallback) {

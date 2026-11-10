@@ -103,6 +103,37 @@ class VectorConfigLoaderTest {
     }
 
     @Test
+    void readsRoutes() throws Exception {
+        final VectorConfig cfg = load("""
+            {"backends": [{"name":"lobby","host":"h1","port":1},{"name":"survival","host":"h2","port":2}],
+             "routes": [
+               {"host": "Lobby.Example.com", "backends": ["lobby"]},
+               {"host": "*.example.com", "backends": ["lobby", "Survival"]}
+             ]}
+            """);
+        assertEquals(2, cfg.backends().routes().size());
+        assertEquals("lobby.example.com", cfg.backends().routes().get(0).host());
+        assertEquals(java.util.List.of("lobby", "Survival"), cfg.backends().routes().get(1).backends());
+    }
+
+    @Test
+    void routesMustReferenceKnownBackends() throws Exception {
+        assertTrue(failure("""
+            {"backends": [{"name":"a","host":"h","port":1}],
+             "routes": [{"host": "x.example.com", "backends": ["nope"]}]}
+            """).contains("unknown backend"));
+    }
+
+    @Test
+    void rejectsMalformedAndDuplicateRoutes() throws Exception {
+        final String backends = "\"backends\": [{\"name\":\"a\",\"host\":\"h\",\"port\":1}],";
+        assertTrue(failure("{" + backends + "\"routes\": [{\"backends\": [\"a\"]}]}").contains("missing \"host\""));
+        assertTrue(failure("{" + backends + "\"routes\": [{\"host\": \"x\", \"backends\": []}]}").contains("non-empty"));
+        assertTrue(failure("{" + backends + "\"routes\": [{\"host\":\"x\",\"backends\":[\"a\"]},{\"host\":\"X\",\"backends\":[\"a\"]}]}")
+            .contains("duplicate route"));
+    }
+
+    @Test
     void reportsUnknownBalanceModes() throws Exception {
         assertTrue(failure("{\"balance-mode\": \"fastest\"}").contains("balance-mode"));
     }

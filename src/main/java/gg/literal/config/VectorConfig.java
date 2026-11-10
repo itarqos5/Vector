@@ -74,6 +74,15 @@ public record VectorConfig(
         }
     }
 
+    /**
+     * Sends players who connected with a given host name to a subset of the backends.
+     *
+     * @param host     exact name ("lobby.example.com"), wildcard ("*.example.com") or "*" for everything else
+     * @param backends names of the backends that may serve this host
+     */
+    public record Route(String host, List<String> backends) {
+    }
+
     /** How a backend is probed. */
     public enum HealthMode {
         /** A plain TCP connect: cheap and independent of PROXY protocol or forwarding settings. */
@@ -102,6 +111,7 @@ public record VectorConfig(
      * @param healthFailThreshold  consecutive failures before a backend is marked down
      * @param maxConnectAttempts   how many distinct backends a player connection may try before giving up
      * @param healthMode           how backends are probed
+     * @param routes               optional host name routing table (empty = every player may use every backend)
      */
     public record Backends(
         List<BackendTarget> targets,
@@ -110,7 +120,8 @@ public record VectorConfig(
         int healthTimeoutMs,
         int healthFailThreshold,
         int maxConnectAttempts,
-        HealthMode healthMode
+        HealthMode healthMode,
+        List<Route> routes
     ) {
     }
 
@@ -193,7 +204,8 @@ public record VectorConfig(
                 2000,
                 2,
                 3,
-                HealthMode.TCP
+                HealthMode.TCP,
+                List.of()
             ),
             new Limits(20, 20, 10_000),
             new Status(true, 5000, "§cServer is currently offline", true),
