@@ -644,6 +644,16 @@ public final class DashboardServer {
                 return new Result(true, "Disconnected " + count + " session(s) from " + ip
                     + "; their next login goes to " + backend.name() + ".");
             }
+            case "drain", "undrain" -> {
+                final boolean enable = action.equals("drain");
+                final Backend backend = ctx.pool.findByName(str(body, "backend"));
+                if (backend == null) return new Result(false, "Pick one of the configured backends.");
+                backend.setDraining(enable);
+                log(actor, (enable ? "drain " : "undrain ") + backend.name());
+                return new Result(true, enable
+                    ? backend.name() + " is draining: no new players, " + backend.activeConnections() + " existing session(s) continue."
+                    : backend.name() + " accepts new players again.");
+            }
             case "reload" -> {
                 try {
                     final List<String> restart = ctx.reload();
