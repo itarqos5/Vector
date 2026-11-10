@@ -469,19 +469,31 @@
       const width = linkWidth(b.active);
       let cls = 'rm-link-idle';
       if (!b.healthy) cls = 'rm-link-down';
+      else if (b.draining) cls = 'rm-link-drain';
       else if (b.active > 0) cls = 'rm-link-up';
-      links.append(svg('path', { d: path, class: `rm-link ${cls}`, 'stroke-width': b.healthy ? width : 3 }));
-      if (b.healthy && b.active > 0) {
+      links.append(svg('path', { d: path, class: `rm-link ${cls}`, 'stroke-width': b.healthy && !b.draining ? width : 3 }));
+      if (b.healthy && !b.draining && b.active > 0) {
         flows.append(svg('path', { d: path, class: 'rm-flow', 'stroke-width': Math.max(1.6, width * 0.34) }));
       }
 
       const top = y - backH / 2;
-      nodes.append(svg('rect', { x: backX, y: top, width: backW, height: backH, rx: 10, class: 'rm-node' }));
-      nodes.append(svg('circle', { cx: backX + 18, cy: top + 20, r: 5, class: b.healthy ? 'rm-dot-up' : 'rm-dot-down' }));
+      const tip = svg('title', null, [
+        `${b.name} (${b.address})`,
+        !b.healthy ? 'Down: not receiving players' : b.draining ? 'Draining: existing sessions only' : 'Up',
+        `${b.active} open${b.maxConnections > 0 ? ` of ${b.maxConnections}` : ''}, ${b.total} total, weight ${b.weight}`,
+        b.latencyMs >= 0 ? `Probe latency ${b.latencyMs} ms` : 'No probe result yet',
+      ].join('\n'));
+      const node = svg('g');
+      node.append(tip, svg('rect', { x: backX, y: top, width: backW, height: backH, rx: 10, class: 'rm-node' }));
+      nodes.append(node);
+      nodes.append(svg('circle', { cx: backX + 18, cy: top + 20, r: 5, class: !b.healthy ? 'rm-dot-down' : b.draining ? 'rm-dot-warn' : 'rm-dot-up' }));
       nodes.append(svg('text', { x: backX + 32, y: top + 24, class: 'rm-text' }, clip(b.name, 20)));
-      const detail = b.healthy
-        ? `${b.active} open${b.latencyMs >= 0 ? ` · ${b.latencyMs} ms` : ''}`
-        : 'down';
+      const cap = b.maxConnections > 0 ? `/${b.maxConnections}` : '';
+      const detail = !b.healthy
+        ? 'down'
+        : b.draining
+          ? `draining · ${b.active} open`
+          : `${b.active}${cap} open${b.latencyMs >= 0 ? ` · ${b.latencyMs} ms` : ''}`;
       nodes.append(svg('text', { x: backX + 18, y: top + 44, class: 'rm-sub' }, clip(`${b.address}`, 26)));
       nodes.append(svg('text', { x: backX + backW - 12, y: top + 24, class: 'rm-sub', 'text-anchor': 'end' }, detail));
     });
