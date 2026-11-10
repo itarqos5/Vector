@@ -140,7 +140,8 @@ public final class VectorConfigLoader {
         final Policy policy = new Policy(
             bool(root, "log-chat", dp.logChat()),
             intValue(root, "idle-timeout-seconds", dp.idleTimeoutSeconds(), 0, 86_400),
-            intValue(root, "handshake-timeout-ms", dp.handshakeTimeoutMs(), 0, 600_000)
+            intValue(root, "handshake-timeout-ms", dp.handshakeTimeoutMs(), 0, 600_000),
+            intValue(root, "max-connections", dp.maxConnections(), 0, Integer.MAX_VALUE)
         );
 
         return new VectorConfig(
@@ -290,6 +291,7 @@ public final class VectorConfigLoader {
         line(sb, "log-chat", d.policy().logChat());
         line(sb, "idle-timeout-seconds", d.policy().idleTimeoutSeconds());
         line(sb, "handshake-timeout-ms", d.policy().handshakeTimeoutMs());
+        line(sb, "max-connections", d.policy().maxConnections());
         line(sb, "dashboard-enabled", d.dashboard().enabled());
         line(sb, "dashboard-host", Json.quote(d.dashboard().host()));
         line(sb, "dashboard-port", d.dashboard().port());

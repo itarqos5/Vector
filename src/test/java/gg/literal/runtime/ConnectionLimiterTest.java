@@ -53,6 +53,18 @@ class ConnectionLimiterTest {
     }
 
     @Test
+    void globalCapRefusesEveryoneOnceReached() {
+        final ConnectionLimiter limiter = new ConnectionLimiter();
+        final Limits limits = new Limits(0, 0, 1000);
+        assertEquals(ConnectionLimiter.Result.OK, limiter.tryAcquire("1.1.1.1", limits, 2));
+        assertEquals(ConnectionLimiter.Result.OK, limiter.tryAcquire("2.2.2.2", limits, 2));
+        assertEquals(ConnectionLimiter.Result.SERVER_FULL, limiter.tryAcquire("3.3.3.3", limits, 2));
+        assertEquals(2, limiter.openConnections());
+        limiter.release("1.1.1.1");
+        assertEquals(ConnectionLimiter.Result.OK, limiter.tryAcquire("3.3.3.3", limits, 2));
+    }
+
+    @Test
     void sweepDropsIdleEntries() throws Exception {
         final ConnectionLimiter limiter = new ConnectionLimiter();
         final Limits limits = new Limits(5, 5, 10);

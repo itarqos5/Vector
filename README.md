@@ -103,6 +103,7 @@ Older configs that only set `backend-host` / `backend-port` keep working as a si
 | `log-chat` | `true` | yes | Log chat and commands. Set `false` to stop parsing packets once a player is in game, which saves CPU on busy offline-mode backends (joins and leaves are still logged). |
 | `idle-timeout-seconds` | `120` | yes | Close a connection that has sent nothing for this long (new connections only). Clients send keep-alives every few seconds, so silence means a dead peer. `0` disables. |
 | `handshake-timeout-ms` | `5000` | yes | Close a connection that sends no bytes at all within this time (new connections only). `0` disables. |
+| `max-connections` | `0` | yes | Global cap on open client connections (status pings included). New connections beyond it are refused. `0` = unlimited. |
 | `dashboard-enabled` | `true` | no | Start the web dashboard. |
 | `dashboard-host` / `dashboard-port` | `127.0.0.1` / `3000` | no | Where the dashboard listens. Use `0.0.0.0` to reach it from other machines. |
 | `dashboard-password` | empty | no | Password for the dashboard. See [Dashboard](#dashboard). |

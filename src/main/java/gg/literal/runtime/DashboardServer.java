@@ -388,6 +388,7 @@ public final class DashboardServer {
         blocked.put("connectionLimit", m.blockedConnectionLimit.sum());
         blocked.put("connectionRate", m.blockedConnectionRate.sum());
         blocked.put("packetLimit", m.blockedPacketLimit.sum());
+        blocked.put("globalLimit", m.blockedGlobalLimit.sum());
         blocked.put("whitelist", m.blockedWhitelist.sum());
         root.put("blocked", blocked);
 
@@ -522,6 +523,7 @@ public final class DashboardServer {
         out.put("metrics-token", c.metrics().token().isEmpty() ? "(not set)" : "(set)");
         out.put("log-chat", c.policy().logChat());
         out.put("idle-timeout-seconds", c.policy().idleTimeoutSeconds());
+        out.put("max-connections", c.policy().maxConnections());
         out.put("handshake-timeout-ms", c.policy().handshakeTimeoutMs());
         out.put("dashboard-enabled", c.dashboard().enabled());
         out.put("dashboard-host", c.dashboard().host());

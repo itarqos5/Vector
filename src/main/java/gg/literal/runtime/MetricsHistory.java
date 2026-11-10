@@ -101,7 +101,7 @@ public final class MetricsHistory {
 
     private static long blocked(final Metrics m) {
         return m.blockedBan.sum() + m.blockedConnectionLimit.sum() + m.blockedConnectionRate.sum()
-            + m.blockedPacketLimit.sum() + m.blockedWhitelist.sum();
+            + m.blockedPacketLimit.sum() + m.blockedWhitelist.sum() + m.blockedGlobalLimit.sum();
     }
 
     private static long status(final Metrics m) {

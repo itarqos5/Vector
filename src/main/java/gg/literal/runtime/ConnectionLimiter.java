@@ -7,7 +7,7 @@ import java.util.concurrent.ConcurrentHashMap;
 /** Tracks concurrent connections and new-connection rate per client IP. */
 public final class ConnectionLimiter {
 
-    public enum Result { OK, TOO_MANY_CONNECTIONS, TOO_FAST }
+    public enum Result { OK, TOO_MANY_CONNECTIONS, TOO_FAST, SERVER_FULL }
 
     private static final class Counter {
         int active;
@@ -16,12 +16,37 @@ public final class ConnectionLimiter {
     }
 
     private final ConcurrentHashMap<String, Counter> counters = new ConcurrentHashMap<>();
+    private final java.util.concurrent.atomic.AtomicInteger global = new java.util.concurrent.atomic.AtomicInteger();
 
     /**
      * Registers a new connection from {@code ip} unless a limit is hit. A caller that gets
      * {@link Result#OK} must call {@link #release} exactly once when the connection ends.
      */
     public Result tryAcquire(final String ip, final VectorConfig.Limits limits) {
+        return tryAcquire(ip, limits, 0);
+    }
+
+    /**
+     * Like {@link #tryAcquire(String, VectorConfig.Limits)} but also enforces a global cap on open connections
+     * ({@code maxGlobal}, 0 = unlimited).
+     */
+    public Result tryAcquire(final String ip, final VectorConfig.Limits limits, final int maxGlobal) {
+        if (maxGlobal > 0 && global.get() >= maxGlobal) {
+            return Result.SERVER_FULL;
+        }
+        final Result result = acquirePerIp(ip, limits);
+        if (result == Result.OK) {
+            global.incrementAndGet();
+        }
+        return result;
+    }
+
+    /** Open connections currently counted against the global cap. */
+    public int openConnections() {
+        return global.get();
+    }
+
+    private Result acquirePerIp(final String ip, final VectorConfig.Limits limits) {
         final int maxActive = limits.maxConnectionsPerIp();
         final int maxRate = limits.maxConnectionRatePerIp();
         if (maxActive <= 0 && maxRate <= 0) {
@@ -57,6 +82,7 @@ public final class ConnectionLimiter {
     }
 
     public void release(final String ip) {
+        global.updateAndGet(v -> Math.max(0, v - 1));
         counters.computeIfPresent(ip, (k, c) -> {
             c.active = Math.max(0, c.active - 1);
             return c;

@@ -122,8 +122,9 @@ public record VectorConfig(
      *                           clients send keep-alives every few seconds, so silence means a dead peer
      * @param handshakeTimeoutMs close a connection that sends no bytes at all within this time (0 disables),
      *                           which defeats sockets opened only to tie up resources
+     * @param maxConnections global cap on open client connections (0 = unlimited)
      */
-    public record Policy(boolean logChat, int idleTimeoutSeconds, int handshakeTimeoutMs) {
+    public record Policy(boolean logChat, int idleTimeoutSeconds, int handshakeTimeoutMs, int maxConnections) {
     }
 
     public static VectorConfig defaults() {
@@ -151,7 +152,7 @@ public record VectorConfig(
             new Access(false, "§cYou are not whitelisted on this server."),
             new Metrics(false, "127.0.0.1", 9100, ""),
             new Dashboard(true, "127.0.0.1", 3000, ""),
-            new Policy(true, 120, 5000)
+            new Policy(true, 120, 5000, 0)
         );
     }
 

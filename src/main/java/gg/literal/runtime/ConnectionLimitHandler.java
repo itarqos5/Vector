@@ -28,7 +28,8 @@ public final class ConnectionLimitHandler extends ChannelInboundHandlerAdapter {
         }
         final String ip = addr.getAddress().getHostAddress();
         final VectorConfig.Limits limits = config.get().limits();
-        final ConnectionLimiter.Result result = limiter.tryAcquire(ip, limits);
+        final ConnectionLimiter.Result result =
+            limiter.tryAcquire(ip, limits, config.get().policy().maxConnections());
 
         if (result == ConnectionLimiter.Result.OK) {
             countedIp = ip;
@@ -36,7 +37,10 @@ public final class ConnectionLimitHandler extends ChannelInboundHandlerAdapter {
             return;
         }
 
-        if (result == ConnectionLimiter.Result.TOO_FAST) {
+        if (result == ConnectionLimiter.Result.SERVER_FULL) {
+            Metrics.INSTANCE.blockedGlobalLimit.increment();
+            LOG.warn("Global connection limit of " + config.get().policy().maxConnections() + " reached; refusing " + ip);
+        } else if (result == ConnectionLimiter.Result.TOO_FAST) {
             Metrics.INSTANCE.blockedConnectionRate.increment();
             LOG.warn("Connection rate limit: " + ip + " exceeded " + limits.maxConnectionRatePerIp()
                 + " connections per " + limits.connectionRateWindowMs() + "ms");

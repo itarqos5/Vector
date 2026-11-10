@@ -17,6 +17,7 @@ public final class Metrics {
     public final LongAdder blockedConnectionLimit = new LongAdder();
     public final LongAdder blockedConnectionRate = new LongAdder();
     public final LongAdder blockedPacketLimit = new LongAdder();
+    public final LongAdder blockedGlobalLimit = new LongAdder();
     public final LongAdder blockedWhitelist = new LongAdder();
 
     public final LongAdder statusFromCache = new LongAdder();

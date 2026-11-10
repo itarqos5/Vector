@@ -103,6 +103,7 @@ public final class MetricsServer {
         blocked(sb, "connection_limit", m.blockedConnectionLimit.sum());
         blocked(sb, "connection_rate", m.blockedConnectionRate.sum());
         blocked(sb, "packet_limit", m.blockedPacketLimit.sum());
+        blocked(sb, "global_limit", m.blockedGlobalLimit.sum());
         blocked(sb, "whitelist", m.blockedWhitelist.sum());
 
         sb.append("# HELP vector_status_responses_total Server list pings answered, by source\n# TYPE vector_status_responses_total counter\n");
@@ -151,6 +152,7 @@ public final class MetricsServer {
         blocked.put("connectionLimit", m.blockedConnectionLimit.sum());
         blocked.put("connectionRate", m.blockedConnectionRate.sum());
         blocked.put("packetLimit", m.blockedPacketLimit.sum());
+        blocked.put("globalLimit", m.blockedGlobalLimit.sum());
         blocked.put("whitelist", m.blockedWhitelist.sum());
         root.put("blocked", blocked);
 
