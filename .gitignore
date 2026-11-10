@@ -42,5 +42,11 @@ tests/config.json
 tests/libraries/
 tests/vector-1.0.0-SNAPSHOT.jar
 
+# Runtime state written by the console commands
+ban-list.txt
+whitelist.txt
+tests/ban-list.txt
+tests/whitelist.txt
+
 # GitHub
 .github/
