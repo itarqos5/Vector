@@ -49,6 +49,20 @@ class ActivityLogTest {
     }
 
     @Test
+    void listenersSeeEveryEventAndCannotBreakRecording() {
+        final ActivityLog log = new ActivityLog(5);
+        final List<String> seen = new java.util.ArrayList<>();
+        log.addListener(e -> { throw new IllegalStateException("broken listener"); });
+        log.addListener(e -> seen.add(e.type() + ":" + e.subject()));
+
+        log.record("JOIN", "Alex", "1.2.3.4");
+        log.record("LEAVE", "Alex", "");
+
+        assertEquals(List.of("JOIN:Alex", "LEAVE:Alex"), seen);
+        assertEquals(2, log.since(0, 10).size());
+    }
+
+    @Test
     void nullTextBecomesEmpty() {
         final ActivityLog log = new ActivityLog(2);
         log.record("X", null, null);

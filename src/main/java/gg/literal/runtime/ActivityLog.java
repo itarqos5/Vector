@@ -4,6 +4,8 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Consumer;
 
 /**
  * A bounded, in-memory feed of notable events (players joining and leaving, backends going up and down,
@@ -26,12 +28,30 @@ public final class ActivityLog {
         this.events = new ArrayDeque<>(capacity);
     }
 
-    public synchronized void record(final String type, final String subject, final String detail) {
-        if (events.size() >= capacity) {
-            events.removeFirst();
+    private final List<Consumer<Event>> listeners = new CopyOnWriteArrayList<>();
+
+    /** Registers a callback invoked for every new event, on the thread that recorded it (keep it fast). */
+    public void addListener(final Consumer<Event> listener) {
+        listeners.add(listener);
+    }
+
+    public void record(final String type, final String subject, final String detail) {
+        final Event event;
+        synchronized (this) {
+            if (events.size() >= capacity) {
+                events.removeFirst();
+            }
+            event = new Event(nextSeq++, System.currentTimeMillis(), type, subject == null ? "" : subject,
+                detail == null ? "" : detail);
+            events.addLast(event);
         }
-        events.addLast(new Event(nextSeq++, System.currentTimeMillis(), type, subject == null ? "" : subject,
-            detail == null ? "" : detail));
+        for (final Consumer<Event> listener : listeners) {
+            try {
+                listener.accept(event);
+            } catch (RuntimeException ignored) {
+                // a faulty listener must not break the code that recorded the event
+            }
+        }
     }
 
     /** Events with a sequence number above {@code afterSeq}, oldest first, at most {@code max} (the newest ones). */
