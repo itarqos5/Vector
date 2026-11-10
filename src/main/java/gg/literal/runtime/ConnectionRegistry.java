@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
 
@@ -36,6 +37,9 @@ public final class ConnectionRegistry {
      */
     private final ConcurrentHashMap<String, Channel> activeChannels = new ConcurrentHashMap<>();
 
+    /** Index: client IP -> address keys of its open connections, so per-IP actions do not scan everything. */
+    private final ConcurrentHashMap<String, Set<String>> keysByIp = new ConcurrentHashMap<>();
+
     /**
      * Key: plain IP. One-shot override applied when a player with this IP
      * makes their next inbound connection.
@@ -50,9 +54,7 @@ public final class ConnectionRegistry {
      */
     public void sendToServer(final String ip, final String destHost, final int destPort) {
         setNextBackend(ip, new InetSocketAddress(destHost, destPort)); // fallback for manual reconnect
-        for (final Map.Entry<String, Channel> entry : activeChannels.entrySet()) {
-            if (!entry.getKey().startsWith(ip + ":")) continue;
-            final Channel ch = entry.getValue();
+        for (final Channel ch : channelsOf(ip)) {
             if (!ch.isActive()) continue;
 
             final Integer protoVer = ch.attr(MinecraftProtocolSniffer.ATTR_PROTOCOL_VERSION).get();
@@ -129,10 +131,19 @@ public final class ConnectionRegistry {
     public void register(final String addressKey, final Channel channel) {
         channel.attr(ATTR_CONNECTED_AT).set(System.currentTimeMillis());
         activeChannels.put(addressKey, channel);
+        keysByIp.compute(ipOfKey(addressKey), (ip, keys) -> {
+            final Set<String> set = keys == null ? ConcurrentHashMap.newKeySet() : keys;
+            set.add(addressKey);
+            return set;
+        });
     }
 
     public void unregister(final String addressKey) {
         activeChannels.remove(addressKey);
+        keysByIp.computeIfPresent(ipOfKey(addressKey), (ip, keys) -> {
+            keys.remove(addressKey);
+            return keys.isEmpty() ? null : keys;
+        });
     }
 
     /**
@@ -141,16 +152,34 @@ public final class ConnectionRegistry {
      */
     public int kickByIp(final String ip) {
         int count = 0;
-        for (final Map.Entry<String, Channel> entry : activeChannels.entrySet()) {
-            if (entry.getKey().startsWith(ip + ":")) {
-                final Channel ch = entry.getValue();
-                if (ch.isActive()) {
-                    ch.close();
-                    count++;
-                }
+        for (final Channel ch : channelsOf(ip)) {
+            if (ch.isActive()) {
+                ch.close();
+                count++;
             }
         }
         return count;
+    }
+
+    /** Open channels of one client IP, found through the per-IP index instead of scanning every connection. */
+    private List<Channel> channelsOf(final String ip) {
+        final Set<String> keys = keysByIp.get(ip);
+        if (keys == null) {
+            return List.of();
+        }
+        final List<Channel> out = new ArrayList<>(keys.size());
+        for (final String key : keys) {
+            final Channel channel = activeChannels.get(key);
+            if (channel != null) {
+                out.add(channel);
+            }
+        }
+        return out;
+    }
+
+    private static String ipOfKey(final String key) {
+        final int colon = key.lastIndexOf(':');
+        return colon > 0 ? key.substring(0, colon) : key;
     }
 
     /**
