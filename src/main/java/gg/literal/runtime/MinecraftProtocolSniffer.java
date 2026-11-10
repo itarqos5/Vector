@@ -4,9 +4,11 @@ import gg.literal.log.TerminalLogger;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelDuplexHandler;
+import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
 import io.netty.util.AttributeKey;
+import io.netty.util.ReferenceCountUtil;
 
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
@@ -32,13 +34,22 @@ public final class MinecraftProtocolSniffer extends ChannelDuplexHandler {
     public static final AttributeKey<Boolean> ATTR_COMPRESSION =
             AttributeKey.newInstance("vec-compression");
 
+    /** Username from Login Start, once validated. */
+    public static final AttributeKey<String> ATTR_PLAYER_NAME =
+            AttributeKey.newInstance("vec-player-name");
+
     private enum State { HANDSHAKE, STATUS, LOGIN, CONFIGURATION, PLAY, IGNORED }
+
+    private final Whitelist whitelist;
+    private final ConfigHolder config;
 
     private State state = State.HANDSHAKE;
     private String playerName = null;
     private String clientIp = "?";
     private int protocolVersion = -1;
     private boolean compressionEnabled = false;
+    /** Set when the whitelist refused the login; the triggering bytes must not reach the backend. */
+    private boolean blocked = false;
     /** True while S\u2192C is still in the LOGIN phase (after Handshake, before Login Acknowledged). */
     private boolean outLoginPhase = false;
 
@@ -46,6 +57,11 @@ public final class MinecraftProtocolSniffer extends ChannelDuplexHandler {
     private final ByteBuf accumulator = Unpooled.buffer(512);
     // S\u2192C accumulation buffer — used only during LOGIN to detect Set Compression.
     private final ByteBuf outboundAccumulator = Unpooled.buffer(256);
+
+    public MinecraftProtocolSniffer(final Whitelist whitelist, final ConfigHolder config) {
+        this.whitelist = whitelist;
+        this.config = config;
+    }
 
     // -------------------------------------------------------------------------
     // Netty lifecycle
@@ -61,12 +77,20 @@ public final class MinecraftProtocolSniffer extends ChannelDuplexHandler {
 
     @Override
     public void channelRead(final ChannelHandlerContext ctx, final Object msg) {
+        if (blocked) {
+            ReferenceCountUtil.release(msg);
+            return;
+        }
         if (msg instanceof ByteBuf data && state != State.IGNORED && state != State.STATUS) {
             // Copy into our private buffer WITHOUT consuming the original ByteBuf.
             accumulator.writeBytes(data.slice());
             tryParse(ctx);
+            if (blocked) {
+                ReferenceCountUtil.release(msg);
+                return;
+            }
         }
-        ctx.fireChannelRead(msg); // always pass bytes through unchanged
+        ctx.fireChannelRead(msg); // pass bytes through unchanged
     }
 
     /**
@@ -141,6 +165,10 @@ public final class MinecraftProtocolSniffer extends ChannelDuplexHandler {
                     accumulator.clear();
                     return;
                 }
+                if (blocked) {
+                    accumulator.clear();
+                    return;
+                }
             }
             accumulator.readerIndex(packetEnd);
         }
@@ -166,8 +194,14 @@ public final class MinecraftProtocolSniffer extends ChannelDuplexHandler {
             case LOGIN -> {
                 if (packetId == 0x00) { // Login Start
                     final String name = readString(accumulator);
-                    if (isValidMinecraftName(name)) {
+                    final boolean valid = isValidMinecraftName(name);
+                    if (!isWhitelisted(valid ? name : null)) {
+                        denyLogin(ctx, valid ? name : String.valueOf(name));
+                        return;
+                    }
+                    if (valid) {
                         playerName = name;
+                        ctx.channel().attr(ATTR_PLAYER_NAME).set(name);
                         TerminalLogger.info("[JOIN] " + name + " (" + clientIp + ") is connecting");
                     } else {
                         state = State.IGNORED;
@@ -204,6 +238,22 @@ public final class MinecraftProtocolSniffer extends ChannelDuplexHandler {
     // -------------------------------------------------------------------------
     // S\u2192C packet parsing (LOGIN phase only — compression detection)
     // -------------------------------------------------------------------------
+
+    private boolean isWhitelisted(final String validName) {
+        if (!config.get().access().whitelistEnabled()) {
+            return true;
+        }
+        return whitelist.isAllowed(validName, clientIp);
+    }
+
+    private void denyLogin(final ChannelHandlerContext ctx, final String name) {
+        blocked = true;
+        state = State.IGNORED;
+        Metrics.INSTANCE.blockedWhitelist.increment();
+        TerminalLogger.warn("[WHITELIST] Refused " + name + " (" + clientIp + ")");
+        final String message = config.get().access().whitelistMessage();
+        ctx.writeAndFlush(McProtocol.loginDisconnect(ctx.alloc(), message)).addListener(ChannelFutureListener.CLOSE);
+    }
 
     private void tryParseOutbound(final ChannelHandlerContext ctx) {
         while (outboundAccumulator.isReadable()) {

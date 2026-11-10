@@ -20,7 +20,7 @@ public final class SecurePipelineInitializer extends ChannelInitializer<SocketCh
         final VectorConfig config = context.config.get();
         channel.pipeline().addLast("ban-check", banCheckHandler);
         channel.pipeline().addLast("connection-limit", new ConnectionLimitHandler(context.limiter, context.config));
-        channel.pipeline().addLast("mc-sniffer", new MinecraftProtocolSniffer());
+        channel.pipeline().addLast("mc-sniffer", new MinecraftProtocolSniffer(context.whitelist, context.config));
         channel.pipeline().addLast("packet-limiter", new PacketLimiterHandler(
             config.maxBytesPerSecond(),
             config.maxPacketsPerSecond()

@@ -159,6 +159,10 @@ public final class ConnectionRegistry {
         for (final Map.Entry<String, Channel> entry : activeChannels.entrySet()) {
             final Channel channel = entry.getValue();
             final StringBuilder line = new StringBuilder(entry.getKey());
+            final String player = channel.attr(MinecraftProtocolSniffer.ATTR_PLAYER_NAME).get();
+            if (player != null) {
+                line.append(" (").append(player).append(')');
+            }
             final String backend = channel.attr(EuFrontendHandler.ATTR_BACKEND).get();
             if (backend != null) {
                 line.append(" -> ").append(backend);

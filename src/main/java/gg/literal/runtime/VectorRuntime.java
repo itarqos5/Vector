@@ -28,6 +28,8 @@ public final class VectorRuntime {
 
         final BanList banList = new BanList(Path.of("ban-list.txt"));
         banList.load();
+        final Whitelist whitelist = new Whitelist(Path.of("whitelist.txt"));
+        whitelist.load();
 
         final BackendPool pool = new BackendPool(holder);
 
@@ -39,7 +41,7 @@ public final class VectorRuntime {
 
         final HealthChecker healthChecker = new HealthChecker(pool, holder, scheduler);
         final ConnectionLimiter limiter = new ConnectionLimiter();
-        final VectorContext context = new VectorContext(holder, new ConnectionRegistry(), banList, pool, limiter);
+        final VectorContext context = new VectorContext(holder, new ConnectionRegistry(), banList, whitelist, pool, limiter);
 
         probeBackends(config, pool, healthChecker);
         healthChecker.start();

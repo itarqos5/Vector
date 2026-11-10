@@ -108,6 +108,7 @@ public final class VectorConsole {
             case "ban" -> ban(parts);
             case "unban" -> unban(parts);
             case "banlist" -> banlist();
+            case "whitelist" -> whitelist(parts);
 
             case "stop" -> {
                 TerminalLogger.info("Stopping Vector...");
@@ -225,6 +226,37 @@ public final class VectorConsole {
         }
     }
 
+    private void whitelist(final String[] parts) {
+        final String sub = parts.length > 1 ? parts[1].toLowerCase() : "list";
+        switch (sub) {
+            case "list" -> {
+                final boolean enabled = ctx.config.get().access().whitelistEnabled();
+                final List<String> entries = ctx.whitelist.entries();
+                TerminalLogger.info("Whitelist is " + (enabled ? "ENABLED" : "disabled (whitelist-enabled=false)")
+                    + ", " + entries.size() + " entr" + (entries.size() == 1 ? "y" : "ies") + ":");
+                for (final String entry : entries) TerminalLogger.info("  " + entry);
+            }
+            case "add" -> {
+                if (parts.length < 3) { TerminalLogger.warn("Usage: whitelist add <username|ip|cidr>"); return; }
+                final String stored = ctx.whitelist.add(parts[2]);
+                if (stored == null) {
+                    TerminalLogger.warn("Already whitelisted (or invalid): " + parts[2]);
+                } else {
+                    TerminalLogger.info("Whitelisted: " + stored);
+                }
+            }
+            case "remove" -> {
+                if (parts.length < 3) { TerminalLogger.warn("Usage: whitelist remove <username|ip|cidr>"); return; }
+                if (ctx.whitelist.remove(parts[2])) {
+                    TerminalLogger.info("Removed from whitelist: " + parts[2]);
+                } else {
+                    TerminalLogger.warn("Not on the whitelist: " + parts[2]);
+                }
+            }
+            default -> TerminalLogger.warn("Usage: whitelist [list|add <entry>|remove <entry>]");
+        }
+    }
+
     private void backends() {
         final List<Backend> all = ctx.pool.all();
         TerminalLogger.info("Backends (" + all.size() + ", " + ctx.pool.mode().id() + "):");
@@ -267,7 +299,7 @@ public final class VectorConsole {
 
     private static void printHelp() {
         TerminalLogger.info("Vector commands:");
-        TerminalLogger.info("  list                          - list active connections (backend)");
+        TerminalLogger.info("  list                          - list active connections (player, backend)");
         TerminalLogger.info("  backends                      - show backend health, load and latency");
         TerminalLogger.info("  stats                         - traffic, blocks and status ping counters");
         TerminalLogger.info("  kick <ip>                     - disconnect a player by IP");
@@ -276,6 +308,7 @@ public final class VectorConsole {
         TerminalLogger.info("  ban <ip|cidr> [30m|12h|7d] [reason...] - ban (optionally timed) and kick");
         TerminalLogger.info("  unban <ip|cidr>               - remove a ban");
         TerminalLogger.info("  banlist                       - show all bans");
+        TerminalLogger.info("  whitelist [list|add|remove]   - manage whitelist.txt (needs whitelist-enabled)");
         TerminalLogger.info("  stop                          - gracefully shut down Vector");
     }
 }
