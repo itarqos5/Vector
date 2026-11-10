@@ -26,8 +26,8 @@ public final class VectorRuntime {
 
         final ConnectionRegistry registry = new ConnectionRegistry();
 
-        TerminalLogger.info("Probing backend at " + config.backendHost() + ":" + config.backendPort() + "...");
-        BackendDetector.detect(config.backendHost(), config.backendPort());
+        TerminalLogger.info("Probing backend at " + config.backends().targets().get(0).host() + ":" + config.backends().targets().get(0).port() + "...");
+        BackendDetector.detect(config.backends().targets().get(0).host(), config.backends().targets().get(0).port());
 
         new VectorConsole(registry, banList).start();
 
@@ -51,7 +51,7 @@ public final class VectorRuntime {
             final Channel server = bootstrap.bind(config.bindHost(), config.bindPort()).syncUninterruptibly().channel();
             TerminalLogger.info(
                 "Vector online on " + config.bindHost() + ":" + config.bindPort()
-                    + " -> " + config.backendHost() + ":" + config.backendPort()
+                    + " -> " + config.backends().targets().get(0).host() + ":" + config.backends().targets().get(0).port()
                     + " | boss=" + config.bossThreads() + " worker=" + config.workerThreads()
             );
 

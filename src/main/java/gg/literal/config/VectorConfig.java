@@ -1,57 +1,131 @@
 package gg.literal.config;
 
-public final class VectorConfig {
+import java.util.List;
+import java.util.Locale;
 
-    private final String bindHost;
-    private final int bindPort;
-    private final String backendHost;
-    private final int backendPort;
-    private final int bossThreads;
-    private final int workerThreads;
-    private final long maxBytesPerSecond;
-    private final long maxPacketsPerSecond;
-    private final int connectTimeoutMs;
-    private final boolean proxyProtocol;
+/**
+ * Immutable snapshot of {@code config.json}. Lives in the launcher class loader so it can be
+ * shared with the child-first runtime class loader.
+ */
+public record VectorConfig(
+    String bindHost,
+    int bindPort,
+    int bossThreads,
+    int workerThreads,
+    long maxBytesPerSecond,
+    long maxPacketsPerSecond,
+    int connectTimeoutMs,
+    boolean proxyProtocol,
+    Backends backends,
+    Limits limits,
+    Status status,
+    Access access,
+    Metrics metrics
+) {
 
-    public VectorConfig(
-        final String bindHost,
-        final int bindPort,
-        final String backendHost,
-        final int backendPort,
-        final int bossThreads,
-        final int workerThreads,
-        final long maxBytesPerSecond,
-        final long maxPacketsPerSecond,
-        final int connectTimeoutMs,
-        final boolean proxyProtocol
+    /** A single upstream server. */
+    public record BackendTarget(String name, String host, int port, int weight) {
+        public String address() {
+            return host + ":" + port;
+        }
+    }
+
+    public enum BalanceMode {
+        ROUND_ROBIN("round-robin"),
+        LEAST_CONNECTIONS("least-connections"),
+        WEIGHTED("weighted"),
+        IP_HASH("ip-hash");
+
+        private final String id;
+
+        BalanceMode(final String id) {
+            this.id = id;
+        }
+
+        public String id() {
+            return id;
+        }
+
+        /** Returns the matching mode, or {@code null} if {@code value} is not recognised. */
+        public static BalanceMode parse(final String value) {
+            if (value == null) {
+                return null;
+            }
+            final String normalized = value.trim().toLowerCase(Locale.ROOT).replace('_', '-');
+            for (final BalanceMode mode : values()) {
+                if (mode.id.equals(normalized)) {
+                    return mode;
+                }
+            }
+            return null;
+        }
+    }
+
+    /**
+     * Backend pool settings.
+     *
+     * @param healthIntervalMs     delay between active TCP health probes
+     * @param healthTimeoutMs      connect timeout of a health probe
+     * @param healthFailThreshold  consecutive failures before a backend is marked down
+     * @param maxConnectAttempts   how many distinct backends a player connection may try before giving up
+     */
+    public record Backends(
+        List<BackendTarget> targets,
+        BalanceMode mode,
+        int healthIntervalMs,
+        int healthTimeoutMs,
+        int healthFailThreshold,
+        int maxConnectAttempts
     ) {
-        this.bindHost = bindHost;
-        this.bindPort = bindPort;
-        this.backendHost = backendHost;
-        this.backendPort = backendPort;
-        this.bossThreads = bossThreads;
-        this.workerThreads = workerThreads;
-        this.maxBytesPerSecond = maxBytesPerSecond;
-        this.maxPacketsPerSecond = maxPacketsPerSecond;
-        this.connectTimeoutMs = connectTimeoutMs;
-        this.proxyProtocol = proxyProtocol;
+    }
+
+    /** Per-IP connection limits. A value of {@code 0} disables the respective limit. */
+    public record Limits(int maxConnectionsPerIp, int maxConnectionRatePerIp, int connectionRateWindowMs) {
+    }
+
+    /**
+     * Server list ping handling.
+     *
+     * @param cacheEnabled whether pings are answered from a periodically refreshed cache
+     * @param cacheTtlMs   refresh interval of the cache
+     * @param offlineMotd  MOTD shown while every backend is down; empty disables the offline response
+     * @param sumPlayers   report the summed player counts of all healthy backends
+     */
+    public record Status(boolean cacheEnabled, int cacheTtlMs, String offlineMotd, boolean sumPlayers) {
+    }
+
+    /** Login gating. */
+    public record Access(boolean whitelistEnabled, String whitelistMessage) {
+    }
+
+    /** Metrics HTTP endpoint. */
+    public record Metrics(boolean enabled, String host, int port, String token) {
     }
 
     public static VectorConfig defaults() {
         final int available = Runtime.getRuntime().availableProcessors();
         final int workerDefault = Math.max(1, available - 1);
-        final int bindPort = envPortOrDefault(25565);
         return new VectorConfig(
             "0.0.0.0",
-            bindPort,
-            "127.0.0.1",
-            25577,
+            envPortOrDefault(25565),
             1,
             workerDefault,
             2_097_152L,
             4000L,
             3000,
-            false
+            false,
+            new Backends(
+                List.of(new BackendTarget("main", "127.0.0.1", 25577, 1)),
+                BalanceMode.ROUND_ROBIN,
+                5000,
+                2000,
+                2,
+                3
+            ),
+            new Limits(20, 20, 10_000),
+            new Status(true, 5000, "§cServer is currently offline", true),
+            new Access(false, "§cYou are not whitelisted on this server."),
+            new Metrics(false, "127.0.0.1", 9100, "")
         );
     }
 
@@ -65,45 +139,5 @@ public final class VectorConfig {
         } catch (NumberFormatException ignored) {
             return fallback;
         }
-    }
-
-    public String bindHost() {
-        return bindHost;
-    }
-
-    public int bindPort() {
-        return bindPort;
-    }
-
-    public String backendHost() {
-        return backendHost;
-    }
-
-    public int backendPort() {
-        return backendPort;
-    }
-
-    public int bossThreads() {
-        return bossThreads;
-    }
-
-    public int workerThreads() {
-        return workerThreads;
-    }
-
-    public long maxBytesPerSecond() {
-        return maxBytesPerSecond;
-    }
-
-    public long maxPacketsPerSecond() {
-        return maxPacketsPerSecond;
-    }
-
-    public int connectTimeoutMs() {
-        return connectTimeoutMs;
-    }
-
-    public boolean proxyProtocol() {
-        return proxyProtocol;
     }
 }

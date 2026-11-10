@@ -48,8 +48,8 @@ public final class EuFrontendHandler extends ChannelInboundHandlerAdapter {
 
         // Honour one-shot backend override set by the "send" console command
         final java.net.InetSocketAddress backendOverride = registry.pollNextBackend(clientIp);
-        final String backendHost = backendOverride != null ? backendOverride.getHostString() : config.backendHost();
-        final int backendPort = backendOverride != null ? backendOverride.getPort() : config.backendPort();
+        final String backendHost = backendOverride != null ? backendOverride.getHostString() : config.backends().targets().get(0).host();
+        final int backendPort = backendOverride != null ? backendOverride.getPort() : config.backends().targets().get(0).port();
 
         final Bootstrap bootstrap = new Bootstrap()
             .group(inboundChannel.eventLoop())
