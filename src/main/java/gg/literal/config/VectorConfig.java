@@ -45,7 +45,9 @@ public record VectorConfig(
         ROUND_ROBIN("round-robin"),
         LEAST_CONNECTIONS("least-connections"),
         WEIGHTED("weighted"),
-        IP_HASH("ip-hash");
+        IP_HASH("ip-hash"),
+        RANDOM("random"),
+        LEAST_LATENCY("least-latency");
 
         private final String id;
 

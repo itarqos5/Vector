@@ -87,6 +87,15 @@ class VectorConfigLoaderTest {
     }
 
     @Test
+    void knowsEveryBalanceMode() {
+        for (final BalanceMode mode : BalanceMode.values()) {
+            assertEquals(mode, BalanceMode.parse(mode.id()));
+        }
+        assertEquals(BalanceMode.LEAST_LATENCY, BalanceMode.parse("LEAST_LATENCY"));
+        assertEquals(BalanceMode.RANDOM, BalanceMode.parse(" random "));
+    }
+
+    @Test
     void reportsUnknownBalanceModes() throws Exception {
         assertTrue(failure("{\"balance-mode\": \"fastest\"}").contains("balance-mode"));
     }

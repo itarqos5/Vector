@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /** The set of configured backends, their health, and the load-balancing policy that picks between them. */
@@ -121,6 +122,8 @@ public final class BackendPool {
             case LEAST_CONNECTIONS -> leastConnections(all, excluded);
             case WEIGHTED -> weighted(all, excluded);
             case IP_HASH -> nth(all, excluded, Math.floorMod(clientIp.hashCode(), usable));
+            case RANDOM -> nth(all, excluded, ThreadLocalRandom.current().nextInt(usable));
+            case LEAST_LATENCY -> leastLatency(all, excluded);
         };
         chosen.acquire();
         return chosen;
@@ -202,6 +205,30 @@ public final class BackendPool {
 
     public static String describe(final Backend backend) {
         return backend.name() + " (" + backend.address() + ")";
+    }
+
+    /**
+     * Prefers the backend that answers fastest, but scales each latency by how loaded the backend already is
+     * so one fast server is not flooded: score = (latency + 1) * (1 + open connections / weight). A backend with
+     * no probe result yet is treated as slow.
+     */
+    private static Backend leastLatency(final List<Backend> all, final Set<Backend> excluded) {
+        Backend best = null;
+        double bestScore = Double.MAX_VALUE;
+        for (int i = 0; i < all.size(); i++) {
+            final Backend candidate = all.get(i);
+            if (!usable(candidate, excluded)) {
+                continue;
+            }
+            final long latency = candidate.latencyMs() < 0 ? 1000L : candidate.latencyMs();
+            final double load = (double) candidate.activeConnections() / Math.max(1, candidate.weight());
+            final double score = (latency + 1) * (1.0 + load);
+            if (score < bestScore) {
+                best = candidate;
+                bestScore = score;
+            }
+        }
+        return best;
     }
 
     private static Backend leastConnections(final List<Backend> all, final Set<Backend> excluded) {

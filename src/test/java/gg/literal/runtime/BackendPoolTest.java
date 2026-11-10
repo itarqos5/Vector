@@ -174,6 +174,32 @@ class BackendPoolTest {
     }
 
     @Test
+    void randomModeUsesEveryBackend() {
+        final BackendPool p = pool(BalanceMode.RANDOM, 2,
+            TestConfigs.target("a", 1, 1), TestConfigs.target("b", 2, 1), TestConfigs.target("c", 3, 1));
+        final Map<String, Integer> counts = pick(p, 600, "1.1.1.1");
+        assertEquals(3, counts.size());
+        counts.values().forEach(v -> assertTrue(v > 100, "each backend should get a fair share: " + counts));
+    }
+
+    @Test
+    void leastLatencyPrefersTheFastestBackendButSpreadsLoad() {
+        final BackendPool p = pool(BalanceMode.LEAST_LATENCY, 2,
+            TestConfigs.target("fast", 1, 1), TestConfigs.target("slow", 2, 1));
+        p.report(p.findByName("fast"), true, 5);
+        p.report(p.findByName("slow"), true, 50);
+
+        assertEquals("fast", p.select("1.1.1.1", Set.of()).name());
+        // The fast backend now has one open connection: (5+1)*2 = 12 is still better than (50+1)*1 = 51.
+        assertEquals("fast", p.select("1.1.1.1", Set.of()).name());
+        for (int i = 0; i < 12; i++) {
+            p.acquire(p.findByName("fast"));
+        }
+        // Heavily loaded fast backend: (5+1)*(1+14) = 90 now loses to the idle slow one at 51.
+        assertEquals("slow", p.select("1.1.1.1", Set.of()).name());
+    }
+
+    @Test
     void markInitialAppliesImmediately() {
         final BackendPool p = pool(BalanceMode.ROUND_ROBIN, 5, TestConfigs.target("a", 1, 1));
         final Backend a = p.findByName("a");

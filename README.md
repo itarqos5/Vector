@@ -83,7 +83,7 @@ Older configs that only set `backend-host` / `backend-port` keep working as a si
 |-----|---------|:---:|-------------|
 | `backends` | one local backend | yes | List of `{name, host, port, weight, max-connections}`. Names must be unique and contain no spaces. `max-connections` (optional, `0` = unlimited) caps the players on one backend; extra players overflow to the others. |
 | `full-message` | `§cAll servers are full…` | yes | Disconnect text when every available backend is at its cap. |
-| `balance-mode` | `round-robin` | yes | `round-robin`, `least-connections` (load ÷ weight), `weighted` (smooth weighted round-robin) or `ip-hash` (a client IP sticks to one backend). |
+| `balance-mode` | `round-robin` | yes | `round-robin`, `least-connections` (load ÷ weight), `weighted` (smooth weighted round-robin), `ip-hash` (a client IP sticks to one backend), `random`, or `least-latency` (prefers the backend with the fastest health probe, scaled by how loaded it is). |
 | `health-check-interval-ms` | `5000` | yes | Delay between TCP health probes. |
 | `health-check-timeout-ms` | `2000` | yes | Connect timeout of a probe. |
 | `health-check-failures` | `2` | yes | Consecutive failures (probes or real connects) before a backend is marked down. One success brings it back. |
