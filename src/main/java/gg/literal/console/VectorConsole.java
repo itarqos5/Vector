@@ -77,40 +77,16 @@ public final class VectorConsole {
 
         switch (command) {
             case "help" -> printHelp();
-
-            case "list" -> {
-                final List<String> connections = ctx.registry.listConnections();
-                if (connections.isEmpty()) {
-                    TerminalLogger.info("No active connections.");
-                } else {
-                    TerminalLogger.info("Active connections (" + connections.size() + "):");
-                    for (final String entry : connections) {
-                        TerminalLogger.info("  " + entry);
-                    }
-                }
-            }
-
-            case "backends" -> backends();
-            case "stats" -> stats();
-            case "reload" -> reload();
-
-            case "kick" -> {
-                if (parts.length < 2) { TerminalLogger.warn("Usage: kick <ip>"); return; }
-                final String ip = parts[1];
-                final int count = ctx.registry.kickByIp(ip);
-                if (count > 0) {
-                    TerminalLogger.info("Kicked " + count + " connection(s) from " + ip);
-                } else {
-                    TerminalLogger.warn("No active connections found for IP: " + ip);
-                }
-            }
-
+            case "list" -> list();
+            case "kick" -> kick(parts);
             case "send" -> send(parts);
-
             case "ban" -> ban(parts);
             case "unban" -> unban(parts);
             case "banlist" -> banlist();
             case "whitelist" -> whitelist(parts);
+            case "backends" -> backends();
+            case "reload" -> reload();
+            case "stats" -> stats();
 
             case "stop" -> {
                 TerminalLogger.info("Stopping Vector...");
@@ -123,6 +99,31 @@ public final class VectorConsole {
                 }
                 TerminalLogger.warn("Unknown command: \"" + parts[0] + "\". Type 'help' for the command list.");
             }
+        }
+    }
+
+    // ------------------------------------------------------------------ connections
+
+    private void list() {
+        final List<String> connections = ctx.registry.listConnections();
+        if (connections.isEmpty()) {
+            TerminalLogger.info("No active connections.");
+        } else {
+            TerminalLogger.info("Active connections (" + connections.size() + "):");
+            for (final String entry : connections) {
+                TerminalLogger.info("  " + entry);
+            }
+        }
+    }
+
+    private void kick(final String[] parts) {
+        if (parts.length < 2) { TerminalLogger.warn("Usage: kick <ip>"); return; }
+        final String ip = parts[1];
+        final int count = ctx.registry.kickByIp(ip);
+        if (count > 0) {
+            TerminalLogger.info("Kicked " + count + " connection(s) from " + ip);
+        } else {
+            TerminalLogger.warn("No active connections found for IP: " + ip);
         }
     }
 
@@ -154,6 +155,8 @@ public final class VectorConsole {
         ctx.registry.sendToServer(ip, destHost, destPort);
         TerminalLogger.info("[SEND] Transferring " + ip + " -> " + destHost + ":" + destPort);
     }
+
+    // ------------------------------------------------------------------ bans
 
     private void ban(final String[] parts) {
         if (parts.length < 2) {
@@ -228,6 +231,8 @@ public final class VectorConsole {
         }
     }
 
+    // ------------------------------------------------------------------ whitelist
+
     private void whitelist(final String[] parts) {
         final String sub = parts.length > 1 ? parts[1].toLowerCase() : "list";
         switch (sub) {
@@ -258,6 +263,8 @@ public final class VectorConsole {
             default -> TerminalLogger.warn("Usage: whitelist [list|add <entry>|remove <entry>]");
         }
     }
+
+    // ------------------------------------------------------------------ backends / ops
 
     private void backends() {
         final List<Backend> all = ctx.pool.all();
@@ -325,6 +332,6 @@ public final class VectorConsole {
         TerminalLogger.info("  unban <ip|cidr>               - remove a ban");
         TerminalLogger.info("  banlist                       - show all bans");
         TerminalLogger.info("  whitelist [list|add|remove]   - manage whitelist.txt (needs whitelist-enabled)");
-        TerminalLogger.info("  stop                          - gracefully shut down Vector");
+        TerminalLogger.info("  stop                          - shut down Vector");
     }
 }
