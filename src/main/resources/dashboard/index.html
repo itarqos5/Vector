@@ -35,6 +35,7 @@
       <button class="tab-btn" data-tab="overview" aria-current="page">Overview</button>
       <button class="tab-btn" data-tab="players">Players</button>
       <button class="tab-btn" data-tab="backends">Backends</button>
+      <button class="tab-btn" data-tab="activity">Activity</button>
       <button class="tab-btn" data-tab="access">Access</button>
       <button class="tab-btn" data-tab="logs">Logs</button>
       <button class="tab-btn" data-tab="config">Config</button>
@@ -134,6 +135,27 @@
         </div>
       </div>
       <p class="muted small note">Health comes from a TCP connect to each backend. Edit the list in config.json, then use Reload on the Config tab.</p>
+    </section>
+
+    <!-- Activity -->
+    <section id="tab-activity" class="tab" aria-label="Activity" hidden>
+      <div class="toolbar">
+        <label class="field inline">
+          <span class="label">Show</span>
+          <select id="activityFilter">
+            <option value="ALL">Everything</option>
+            <option value="PLAYERS">Players joining and leaving</option>
+            <option value="BACKENDS">Backend changes</option>
+            <option value="SECURITY">Refusals and bans</option>
+            <option value="ADMIN">Admin actions</option>
+          </select>
+        </label>
+        <span id="activityCount" class="muted small"></span>
+      </div>
+      <div class="card flush">
+        <ol id="activityList" class="feed"></ol>
+        <p id="activityEmpty" class="empty" hidden>Nothing has happened yet. Joins, leaves, backend changes and admin actions show up here as they happen.</p>
+      </div>
     </section>
 
     <!-- Access -->

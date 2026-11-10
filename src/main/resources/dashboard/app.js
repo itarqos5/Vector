@@ -5,6 +5,7 @@
   const POLL_MS = 2000;
   const MAX_HISTORY = 300;
   const MAX_LOG_LINES = 1000;
+  const MAX_ACTIVITY = 500;
   const SVG_NS = 'http://www.w3.org/2000/svg';
 
   const state = {
@@ -13,6 +14,8 @@
     historySeq: 0,
     logs: [],
     logSeq: 0,
+    activity: [],
+    activitySeq: 0,
     tab: 'overview',
     timer: null,
     authRequired: false,
@@ -212,7 +215,7 @@
       return;
     }
     try {
-      const res = await request(`/api/state?history=${state.historySeq}&log=${state.logSeq}`);
+      const res = await request(`/api/state?history=${state.historySeq}&log=${state.logSeq}&activity=${state.activitySeq}`);
       if (res.status === 401) { showLogin(); return; }
       if (!res.ok || !res.body) throw new Error('bad response');
       apply(res.body);
@@ -239,6 +242,12 @@
       appendLogs(d.logs);
     }
     state.logSeq = d.logSeq;
+    if (d.activity.length) {
+      state.activity.push(...d.activity);
+      if (state.activity.length > MAX_ACTIVITY) state.activity.splice(0, state.activity.length - MAX_ACTIVITY);
+      if (state.tab === 'activity') renderActivity();
+    }
+    state.activitySeq = d.activitySeq;
 
     $('bindLabel').textContent = d.bind;
     updateTitle(d);
@@ -275,6 +284,7 @@
       if (name === 'access') renderAccess(state.data, true);
     }
     if (name === 'logs') { renderLogsFull(); }
+    if (name === 'activity') renderActivity();
     if (name === 'config') loadConfig();
   }
 
@@ -778,6 +788,38 @@
   });
   $('logFollow').addEventListener('change', followLogs);
 
+  // ------------------------------------------------------------------ activity
+
+  const ACTIVITY_TYPES = {
+    JOIN: { label: 'Joined', cls: 'tag-join', group: 'PLAYERS' },
+    LEAVE: { label: 'Left', cls: 'tag-leave', group: 'PLAYERS' },
+    REFUSED: { label: 'Refused', cls: 'tag-refused', group: 'SECURITY' },
+    AUTO_BAN: { label: 'Auto-ban', cls: 'tag-ban', group: 'SECURITY' },
+    BACKEND_UP: { label: 'Backend up', cls: 'tag-up', group: 'BACKENDS' },
+    BACKEND_DOWN: { label: 'Backend down', cls: 'tag-down', group: 'BACKENDS' },
+    ADMIN: { label: 'Admin', cls: 'tag-admin', group: 'ADMIN' },
+  };
+
+  function renderActivity() {
+    const filter = $('activityFilter').value;
+    const rows = state.activity
+      .filter((e) => filter === 'ALL' || (ACTIVITY_TYPES[e.type] || {}).group === filter)
+      .slice(-300)
+      .reverse(); // newest first
+    const list = $('activityList');
+    list.replaceChildren(...rows.map((e) => {
+      const meta = ACTIVITY_TYPES[e.type] || { label: e.type, cls: '' };
+      return h('li', { class: 'feed-item' },
+        h('span', { class: 'feed-time', text: fmtClock(e.t) }),
+        h('span', null, h('span', { class: `tag ${meta.cls}`, text: meta.label })),
+        h('span', { class: 'feed-text' }, h('strong', { text: e.subject }), e.detail ? h('span', { class: 'feed-detail', text: `  ${e.detail}` }) : null));
+    }));
+    $('activityEmpty').hidden = rows.length > 0;
+    $('activityCount').textContent = rows.length ? `${rows.length} most recent` : '';
+  }
+
+  $('activityFilter').addEventListener('change', renderActivity);
+
   // ------------------------------------------------------------------ config
 
   async function loadConfig() {
@@ -816,7 +858,7 @@
   $('logSearch').value = prefs.get('logSearch', '');
   if (['ALL', 'WARN', 'ERROR'].includes(prefs.get('logLevel', 'ALL'))) $('logLevel').value = prefs.get('logLevel', 'ALL');
   const initial = (location.hash || '#overview').slice(1);
-  if (['overview', 'players', 'backends', 'access', 'logs', 'config'].includes(initial)) {
+  if (['overview', 'players', 'backends', 'activity', 'access', 'logs', 'config'].includes(initial)) {
     selectTab(initial);
   }
   boot();
