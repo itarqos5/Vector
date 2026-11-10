@@ -40,6 +40,8 @@ public final class DashboardServer {
 
     private static final int MAX_BODY_BYTES = 16 * 1024;
     private static final int MAX_CONNECTIONS_LISTED = 500;
+    /** JSON bodies smaller than this are not worth compressing. */
+    private static final int GZIP_MIN_BYTES = 1024;
     private static final long SESSION_TTL_MS = 12L * 3_600_000L;
     private static final int MAX_LOGIN_FAILURES = 5;
     private static final long LOGIN_LOCK_MS = 60_000L;
@@ -641,9 +643,14 @@ public final class DashboardServer {
     }
 
     private static void sendJson(final HttpExchange ex, final int status, final Object body) throws IOException {
-        final byte[] bytes = Json.write(body).getBytes(StandardCharsets.UTF_8);
+        byte[] bytes = Json.write(body).getBytes(StandardCharsets.UTF_8);
         ex.getResponseHeaders().add("Content-Type", "application/json; charset=utf-8");
         ex.getResponseHeaders().add("Cache-Control", "no-store");
+        ex.getResponseHeaders().add("Vary", "Accept-Encoding");
+        if (bytes.length > GZIP_MIN_BYTES && acceptsGzip(ex)) {
+            bytes = gzip(bytes);
+            ex.getResponseHeaders().add("Content-Encoding", "gzip");
+        }
         ex.sendResponseHeaders(status, bytes.length);
         ex.getResponseBody().write(bytes);
     }
