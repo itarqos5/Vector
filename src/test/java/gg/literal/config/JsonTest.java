@@ -71,4 +71,23 @@ class JsonTest {
         assertThrows(IllegalArgumentException.class, () -> Json.parse("{\"a\":"));
         assertThrows(IllegalArgumentException.class, () -> Json.parse("\"unterminated"));
     }
+
+    @Test
+    void prettyOutputParsesBackToTheSameTree() {
+        final String source = "{\"a\":1,\"list\":[1,2,3],\"objs\":[{\"x\":true},{\"y\":null}],\"nested\":{\"k\":\"v\"},\"empty\":{},\"none\":[]}";
+        final Object tree = Json.parse(source);
+        assertEquals(tree, Json.parse(Json.writePretty(tree)));
+    }
+
+    @Test
+    void prettyOutputUsesIndentationAndKeepsScalarArraysInline() {
+        final String pretty = Json.writePretty(Json.parse("{\"a\":[1,2],\"b\":{\"c\":1}}"));
+        assertEquals("{\n  \"a\": [1,2],\n  \"b\": {\n    \"c\": 1\n  }\n}\n", pretty);
+    }
+
+    @Test
+    void prettyOutputPutsObjectArrayEntriesOnSeparateLines() {
+        final String pretty = Json.writePretty(Json.parse("{\"backends\":[{\"n\":1},{\"n\":2}]}"));
+        assertTrue(pretty.contains("[\n    {\n      \"n\": 1\n    },\n    {\n      \"n\": 2\n    }\n  ]"), pretty);
+    }
 }

@@ -289,6 +289,70 @@ public final class Json {
         }
     }
 
+    /**
+     * Serialises a value tree with two-space indentation. Arrays of scalars stay on one line; objects and arrays
+     * of objects get one entry per line. Used when Vector rewrites config.json.
+     */
+    public static String writePretty(final Object value) {
+        final StringBuilder sb = new StringBuilder();
+        writePretty(sb, value, 0);
+        return sb.append('\n').toString();
+    }
+
+    private static boolean isScalar(final Object value) {
+        return !(value instanceof Map) && !(value instanceof Iterable);
+    }
+
+    private static void writePretty(final StringBuilder sb, final Object value, final int depth) {
+        if (value instanceof Map<?, ?> map && !map.isEmpty()) {
+            sb.append("{\n");
+            boolean first = true;
+            for (final Map.Entry<?, ?> entry : map.entrySet()) {
+                if (!first) {
+                    sb.append(",\n");
+                }
+                first = false;
+                indent(sb, depth + 1);
+                writeString(sb, String.valueOf(entry.getKey()));
+                sb.append(": ");
+                writePretty(sb, entry.getValue(), depth + 1);
+            }
+            sb.append('\n');
+            indent(sb, depth);
+            sb.append('}');
+        } else if (value instanceof Iterable<?> iterable && iterable.iterator().hasNext()) {
+            boolean allScalar = true;
+            for (final Object element : iterable) {
+                allScalar &= isScalar(element);
+            }
+            if (allScalar) {
+                write(sb, value);
+                return;
+            }
+            sb.append("[\n");
+            boolean first = true;
+            for (final Object element : iterable) {
+                if (!first) {
+                    sb.append(",\n");
+                }
+                first = false;
+                indent(sb, depth + 1);
+                writePretty(sb, element, depth + 1);
+            }
+            sb.append('\n');
+            indent(sb, depth);
+            sb.append(']');
+        } else {
+            write(sb, value);
+        }
+    }
+
+    private static void indent(final StringBuilder sb, final int depth) {
+        for (int i = 0; i < depth; i++) {
+            sb.append("  ");
+        }
+    }
+
     /** Appends {@code s} as a quoted, escaped JSON string. */
     public static void writeString(final StringBuilder sb, final String s) {
         sb.append('"');
