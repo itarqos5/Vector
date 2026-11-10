@@ -104,6 +104,8 @@ Older configs that only set `backend-host` / `backend-port` keep working as a si
 | `idle-timeout-seconds` | `120` | yes | Close a connection that has sent nothing for this long (new connections only). Clients send keep-alives every few seconds, so silence means a dead peer. `0` disables. |
 | `handshake-timeout-ms` | `5000` | yes | Close a connection that sends no bytes at all within this time (new connections only). `0` disables. |
 | `max-connections` | `0` | yes | Global cap on open client connections (status pings included). New connections beyond it are refused. `0` = unlimited. |
+| `maintenance-enabled` | `false` | yes | Maintenance mode: refuse logins unless the username or IP is whitelisted. Toggle live with the `maintenance on/off` console command. |
+| `maintenance-message` | `§eThe server is under maintenance…` | yes | Disconnect text shown to refused players. |
 | `dashboard-enabled` | `true` | no | Start the web dashboard. |
 | `dashboard-host` / `dashboard-port` | `127.0.0.1` / `3000` | no | Where the dashboard listens. Use `0.0.0.0` to reach it from other machines. |
 | `dashboard-password` | empty | no | Password for the dashboard. See [Dashboard](#dashboard). |
@@ -130,6 +132,7 @@ Notes:
 | `ban <ip\|cidr> [30m\|12h\|7d] [reason…]` | Permanent or timed ban, e.g. `ban 203.0.113.0/24 7d botnet`. Persisted in `ban-list.txt`. |
 | `unban <ip\|cidr>`, `banlist` | Remove / list bans. |
 | `whitelist [list\|add\|remove] <name\|ip\|cidr>` | Manage `whitelist.txt`. |
+| `maintenance [on\|off]` | Show or switch maintenance mode (saved to `config.json`). |
 | `stop` | Shut down. |
 
 ## Dashboard

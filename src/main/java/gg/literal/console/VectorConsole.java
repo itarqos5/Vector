@@ -85,6 +85,7 @@ public final class VectorConsole {
             case "backends" -> backends();
             case "reload" -> reload();
             case "stats" -> stats();
+            case "maintenance" -> maintenance(parts);
             case "version" -> TerminalLogger.info("Vector " + VectorInfo.version() + " (built " + VectorInfo.builtAt()
                 + ", Java " + System.getProperty("java.version") + ")");
 
@@ -257,6 +258,31 @@ public final class VectorConsole {
         }
     }
 
+    private void maintenance(final String[] parts) {
+        final boolean current = ctx.config.get().policy().maintenance();
+        if (parts.length < 2) {
+            TerminalLogger.info("Maintenance mode is " + (current ? "ON" : "off")
+                + ". Use 'maintenance on' or 'maintenance off'.");
+            return;
+        }
+        final boolean enable;
+        switch (parts[1].toLowerCase()) {
+            case "on", "true", "enable" -> enable = true;
+            case "off", "false", "disable" -> enable = false;
+            default -> {
+                TerminalLogger.warn("Usage: maintenance [on|off]");
+                return;
+            }
+        }
+        try {
+            ctx.config.update(java.util.Map.of("maintenance-enabled", enable));
+            TerminalLogger.info("Maintenance mode " + (enable ? "ENABLED: only whitelisted players can log in."
+                : "disabled: everyone can log in again."));
+        } catch (BootstrapException ex) {
+            TerminalLogger.error("Could not change maintenance mode: " + ex.getMessage());
+        }
+    }
+
     private void reload() {
         try {
             final List<String> restartRequired = ctx.reload();
@@ -282,7 +308,8 @@ public final class VectorConsole {
             + " conn-rate=" + m.blockedConnectionRate.sum()
             + " packet-limit=" + m.blockedPacketLimit.sum()
             + " global-limit=" + m.blockedGlobalLimit.sum()
-            + " whitelist=" + m.blockedWhitelist.sum());
+            + " whitelist=" + m.blockedWhitelist.sum()
+            + " maintenance=" + m.blockedMaintenance.sum());
         TerminalLogger.info("Status pings: cache=" + m.statusFromCache.sum()
             + " offline=" + m.statusOffline.sum()
             + " backend=" + m.statusFromBackend.sum()
@@ -307,6 +334,7 @@ public final class VectorConsole {
         TerminalLogger.info("  backends                      - show backend health, load and latency");
         TerminalLogger.info("  stats                         - traffic, blocks and status ping counters");
         TerminalLogger.info("  version                       - show the Vector and Java versions");
+        TerminalLogger.info("  maintenance [on|off]          - refuse logins except whitelisted players");
         TerminalLogger.info("  reload                        - reload config.json and whitelist.txt without restarting");
         TerminalLogger.info("  kick <ip>                     - disconnect a player by IP");
         TerminalLogger.info("  send <ip> <backend>           - disconnect and route the next login to a named backend");

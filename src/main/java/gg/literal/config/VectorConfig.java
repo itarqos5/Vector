@@ -123,8 +123,18 @@ public record VectorConfig(
      * @param handshakeTimeoutMs close a connection that sends no bytes at all within this time (0 disables),
      *                           which defeats sockets opened only to tie up resources
      * @param maxConnections global cap on open client connections (0 = unlimited)
+     * @param maintenance whether maintenance mode is on: logins are refused (whitelisted names and IPs may still
+     *                    join)
+     * @param maintenanceMessage disconnect text shown to refused players
      */
-    public record Policy(boolean logChat, int idleTimeoutSeconds, int handshakeTimeoutMs, int maxConnections) {
+    public record Policy(
+        boolean logChat,
+        int idleTimeoutSeconds,
+        int handshakeTimeoutMs,
+        int maxConnections,
+        boolean maintenance,
+        String maintenanceMessage
+    ) {
     }
 
     public static VectorConfig defaults() {
@@ -152,7 +162,7 @@ public record VectorConfig(
             new Access(false, "§cYou are not whitelisted on this server."),
             new Metrics(false, "127.0.0.1", 9100, ""),
             new Dashboard(true, "127.0.0.1", 3000, ""),
-            new Policy(true, 120, 5000, 0)
+            new Policy(true, 120, 5000, 0, false, "\u00a7eThe server is under maintenance. Please try again later.")
         );
     }
 

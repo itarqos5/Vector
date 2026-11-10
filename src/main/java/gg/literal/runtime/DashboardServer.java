@@ -390,6 +390,7 @@ public final class DashboardServer {
         blocked.put("packetLimit", m.blockedPacketLimit.sum());
         blocked.put("globalLimit", m.blockedGlobalLimit.sum());
         blocked.put("whitelist", m.blockedWhitelist.sum());
+        blocked.put("maintenance", m.blockedMaintenance.sum());
         root.put("blocked", blocked);
 
         final Map<String, Object> status = new LinkedHashMap<>();
@@ -524,6 +525,8 @@ public final class DashboardServer {
         out.put("log-chat", c.policy().logChat());
         out.put("idle-timeout-seconds", c.policy().idleTimeoutSeconds());
         out.put("max-connections", c.policy().maxConnections());
+        out.put("maintenance-enabled", c.policy().maintenance());
+        out.put("maintenance-message", c.policy().maintenanceMessage());
         out.put("handshake-timeout-ms", c.policy().handshakeTimeoutMs());
         out.put("dashboard-enabled", c.dashboard().enabled());
         out.put("dashboard-host", c.dashboard().host());

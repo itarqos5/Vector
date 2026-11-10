@@ -231,8 +231,15 @@ public final class MinecraftProtocolSniffer extends ChannelDuplexHandler {
                 if (packetId == 0x00) { // Login Start
                     final String name = readString(accumulator);
                     final boolean valid = isValidMinecraftName(name);
+                    final String shownName = valid ? name : String.valueOf(name);
+                    if (config.get().policy().maintenance() && !whitelist.isAllowed(valid ? name : null, clientIp)) {
+                        denyLogin(ctx, shownName, "MAINTENANCE", config.get().policy().maintenanceMessage(),
+                            Metrics.INSTANCE.blockedMaintenance);
+                        return;
+                    }
                     if (!isWhitelisted(valid ? name : null)) {
-                        denyLogin(ctx, valid ? name : String.valueOf(name));
+                        denyLogin(ctx, shownName, "WHITELIST", config.get().access().whitelistMessage(),
+                            Metrics.INSTANCE.blockedWhitelist);
                         return;
                     }
                     if (valid) {
@@ -283,12 +290,12 @@ public final class MinecraftProtocolSniffer extends ChannelDuplexHandler {
         return whitelist.isAllowed(validName, clientIp);
     }
 
-    private void denyLogin(final ChannelHandlerContext ctx, final String name) {
+    private void denyLogin(final ChannelHandlerContext ctx, final String name, final String tag, final String message,
+                           final java.util.concurrent.atomic.LongAdder counter) {
         blocked = true;
         state = State.IGNORED;
-        Metrics.INSTANCE.blockedWhitelist.increment();
-        TerminalLogger.warn("[WHITELIST] Refused " + name + " (" + clientIp + ")");
-        final String message = config.get().access().whitelistMessage();
+        counter.increment();
+        TerminalLogger.warn("[" + tag + "] Refused " + name + " (" + clientIp + ")");
         ctx.writeAndFlush(McProtocol.loginDisconnect(ctx.alloc(), message)).addListener(ChannelFutureListener.CLOSE);
     }
 
