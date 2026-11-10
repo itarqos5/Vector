@@ -191,6 +191,7 @@ table.data { width: 100%; border-collapse: collapse; font-size: 14px; }
 }
 .pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
 .pill.up { color: var(--up); border-color: color-mix(in srgb, var(--up) 40%, var(--line)); }
+.pill.warn { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 45%, var(--line)); }
 .pill.down { color: var(--down); border-color: color-mix(in srgb, var(--down) 40%, var(--line)); }
 
 .latency { display: inline-flex; align-items: center; gap: 8px; }

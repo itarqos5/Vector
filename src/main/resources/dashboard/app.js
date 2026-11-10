@@ -711,15 +711,25 @@
       bar.style.width = `${b.latencyMs < 0 ? 0 : Math.min(100, (b.latencyMs / 200) * 100)}%`;
       body.append(h('tr', null,
         h('td', null, h('strong', { text: b.name })),
-        h('td', null, h('span', { class: b.healthy ? 'pill up' : 'pill down', text: b.healthy ? 'Up' : 'Down' })),
+        h('td', null, !b.healthy
+          ? h('span', { class: 'pill down', text: 'Down' })
+          : b.draining ? h('span', { class: 'pill warn', text: 'Draining' }) : h('span', { class: 'pill up', text: 'Up' })),
         h('td', { class: 'mono', text: b.address }),
         h('td', { class: 'num', text: String(b.weight) }),
         h('td', { class: 'num', text: fmtNumber(b.active) }),
+        h('td', { class: 'num', text: b.maxConnections > 0 ? fmtNumber(b.maxConnections) : '–' }),
         h('td', { class: 'num', text: fmtNumber(b.total) }),
         h('td', { class: 'num', text: fmtNumber(b.failures) }),
         h('td', { class: 'num' }, b.latencyMs >= 0
           ? h('span', { class: 'latency' }, h('span', { class: 'latency-bar' }, bar), `${b.latencyMs} ms`)
-          : '–')));
+          : '–'),
+        h('td', null, h('div', { class: 'row-actions' },
+          h('button', {
+            class: 'ghost small-btn',
+            text: b.draining ? 'Resume' : 'Drain',
+            title: b.draining ? 'Accept new players again' : 'Stop sending new players here',
+            onclick: () => act({ action: b.draining ? 'undrain' : 'drain', backend: b.name }, 'Done.'),
+          })))));
     }
   }
 

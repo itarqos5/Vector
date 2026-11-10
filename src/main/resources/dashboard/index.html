@@ -137,12 +137,12 @@
       <div class="card flush">
         <div class="table-wrap">
           <table class="data" id="backendsTable">
-            <thead><tr><th>Backend</th><th>Health</th><th>Address</th><th class="num">Weight</th><th class="num">Open</th><th class="num">Total</th><th class="num">Failed connects</th><th class="num">Latency</th></tr></thead>
+            <thead><tr><th>Backend</th><th>Health</th><th>Address</th><th class="num">Weight</th><th class="num">Open</th><th class="num">Cap</th><th class="num">Total</th><th class="num">Failed connects</th><th class="num">Latency</th><th class="actions-col">Actions</th></tr></thead>
             <tbody></tbody>
           </table>
         </div>
       </div>
-      <p class="muted small note">Health comes from a TCP connect to each backend. Edit the list in config.json, then use Reload on the Config tab.</p>
+      <p class="muted small note">Draining stops new players from being sent to a backend while its current sessions finish. Health comes from the probe set by <code>health-check-mode</code>. Edit the list in config.json, then use Reload on the Config tab.</p>
     </section>
 
     <!-- Activity -->
