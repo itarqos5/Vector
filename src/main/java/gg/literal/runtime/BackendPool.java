@@ -206,6 +206,7 @@ public final class BackendPool {
             if (!backend.healthy()) {
                 backend.setHealthy(true);
                 TerminalLogger.info("Backend " + describe(backend) + " is UP again");
+                ActivityLog.INSTANCE.record("BACKEND_UP", backend.name(), backend.address());
             }
             return;
         }
@@ -216,6 +217,7 @@ public final class BackendPool {
         if (backend.healthy() && failures >= threshold) {
             backend.setHealthy(false);
             TerminalLogger.warn("Backend " + describe(backend) + " is DOWN (" + failures + " consecutive failures)");
+            ActivityLog.INSTANCE.record("BACKEND_DOWN", backend.name(), backend.address());
         }
     }
 

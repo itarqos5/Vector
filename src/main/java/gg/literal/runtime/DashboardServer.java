@@ -637,6 +637,7 @@ public final class DashboardServer {
 
     private static void log(final String actor, final String what) {
         TerminalLogger.info("[DASHBOARD] " + actor + ": " + what);
+        ActivityLog.INSTANCE.record("ADMIN", "dashboard", what);
     }
 
     private static String str(final Map<String, Object> body, final String key) {

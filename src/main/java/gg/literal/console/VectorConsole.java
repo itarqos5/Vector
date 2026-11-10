@@ -3,6 +3,7 @@ package gg.literal.console;
 import gg.literal.VectorInfo;
 import gg.literal.bootstrap.BootstrapException;
 import gg.literal.log.TerminalLogger;
+import gg.literal.runtime.ActivityLog;
 import gg.literal.runtime.Backend;
 import gg.literal.runtime.BackendPool;
 import gg.literal.runtime.BanList;
@@ -124,6 +125,7 @@ public final class VectorConsole {
         final int count = ctx.registry.kickByIp(ip);
         if (count > 0) {
             TerminalLogger.info("Kicked " + count + " connection(s) from " + ip);
+            audit("kick " + ip);
         } else {
             TerminalLogger.warn("No active connections found for IP: " + ip);
         }
@@ -182,6 +184,7 @@ public final class VectorConsole {
             return;
         }
         TerminalLogger.info("Banned " + describe(entry));
+        audit("ban " + entry.target());
         final int kicked = ctx.registry.kickIf(ctx.banList::isBanned);
         if (kicked > 0) TerminalLogger.info("Kicked " + kicked + " active connection(s)");
     }
@@ -190,6 +193,7 @@ public final class VectorConsole {
         if (parts.length < 2) { TerminalLogger.warn("Usage: unban <ip|cidr>"); return; }
         if (ctx.banList.unban(parts[1])) {
             TerminalLogger.info("Unbanned: " + parts[1]);
+            audit("unban " + parts[1]);
         } else {
             TerminalLogger.warn("Not found in ban list: " + parts[1]);
         }
@@ -259,6 +263,11 @@ public final class VectorConsole {
         }
     }
 
+    /** Puts a console action into the activity feed next to dashboard actions. */
+    private static void audit(final String what) {
+        ActivityLog.INSTANCE.record("ADMIN", "console", what);
+    }
+
     private void drain(final boolean enable, final String[] parts) {
         if (parts.length < 2) {
             TerminalLogger.warn("Usage: " + (enable ? "drain" : "undrain") + " <backend>");
@@ -270,6 +279,7 @@ public final class VectorConsole {
             return;
         }
         backend.setDraining(enable);
+        audit((enable ? "drain " : "undrain ") + backend.name());
         TerminalLogger.info(BackendPool.describe(backend) + (enable
             ? " is draining: no new players, " + backend.activeConnections() + " existing session(s) continue."
             : " accepts new players again."));
@@ -293,6 +303,7 @@ public final class VectorConsole {
         }
         try {
             ctx.config.update(java.util.Map.of("maintenance-enabled", enable));
+            audit("maintenance " + (enable ? "on" : "off"));
             TerminalLogger.info("Maintenance mode " + (enable ? "ENABLED: only whitelisted players can log in."
                 : "disabled: everyone can log in again."));
         } catch (BootstrapException ex) {
@@ -303,6 +314,7 @@ public final class VectorConsole {
     private void reload() {
         try {
             final List<String> restartRequired = ctx.reload();
+            audit("reload");
             TerminalLogger.info("Configuration reloaded (" + ctx.pool.all().size() + " backend(s), "
                 + ctx.pool.mode().id() + ", whitelist " + ctx.whitelist.size() + " entries).");
             if (!restartRequired.isEmpty()) {

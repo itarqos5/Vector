@@ -136,6 +136,7 @@ public final class MinecraftProtocolSniffer extends ChannelDuplexHandler {
     public void channelInactive(final ChannelHandlerContext ctx) {
         if (playerName != null) {
             TerminalLogger.info("[LEAVE] " + playerName + " (" + clientIp + ") disconnected");
+            ActivityLog.INSTANCE.record("LEAVE", playerName, clientIp);
             playerName = null;
         }
         releaseInbound();
@@ -268,6 +269,7 @@ public final class MinecraftProtocolSniffer extends ChannelDuplexHandler {
                         playerName = name;
                         ctx.channel().attr(ATTR_PLAYER_NAME).set(name);
                         TerminalLogger.info("[JOIN] " + name + " (" + clientIp + ") is connecting");
+                        ActivityLog.INSTANCE.record("JOIN", name, clientIp);
                     } else {
                         state = State.IGNORED;
                     }
@@ -341,6 +343,7 @@ public final class MinecraftProtocolSniffer extends ChannelDuplexHandler {
         state = State.IGNORED;
         counter.increment();
         TerminalLogger.warn("[" + tag + "] Refused " + name + " (" + clientIp + ")");
+        ActivityLog.INSTANCE.record("REFUSED", name, tag.toLowerCase() + " (" + clientIp + ")");
         ctx.writeAndFlush(McProtocol.loginDisconnect(ctx.alloc(), message)).addListener(ChannelFutureListener.CLOSE);
     }
 

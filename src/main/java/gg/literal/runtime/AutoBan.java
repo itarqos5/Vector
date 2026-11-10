@@ -43,6 +43,7 @@ public final class AutoBan {
         final long duration = policy.autoBanMinutes() * 60_000L;
         banList.ban(ip, duration, "auto-ban: " + reason);
         Metrics.INSTANCE.autoBans.increment();
+        ActivityLog.INSTANCE.record("AUTOBAN", ip, reason);
         final int kicked = registry.kickByIp(ip);
         TerminalLogger.warn("[AUTOBAN] " + ip + " banned for " + policy.autoBanMinutes() + " minutes after "
             + policy.autoBanViolations() + " violations (" + reason + ")" + (kicked > 0 ? ", closed " + kicked + " connection(s)" : ""));
