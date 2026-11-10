@@ -46,7 +46,7 @@ public final class DashboardServer {
     private static final String CSRF_HEADER = "X-Requested-With";
     private static final String CSRF_VALUE = "vector-dashboard";
 
-    private record Asset(byte[] bytes, String contentType) {
+    private record Asset(byte[] bytes, String contentType, String etag) {
     }
 
     private record Attempts(int failures, long lockedUntil) {
@@ -584,7 +584,8 @@ public final class DashboardServer {
             if (in == null) {
                 throw new IOException("missing resource /dashboard/" + name);
             }
-            return new Asset(in.readAllBytes(), type);
+            final byte[] bytes = in.readAllBytes();
+            return new Asset(bytes, type, etagOf(bytes));
         }
     }
 
@@ -592,8 +593,27 @@ public final class DashboardServer {
         final Asset asset = assets.get(name);
         ex.getResponseHeaders().add("Content-Type", asset.contentType());
         ex.getResponseHeaders().add("Cache-Control", "no-cache");
+        ex.getResponseHeaders().add("ETag", asset.etag());
+        if (asset.etag().equals(ex.getRequestHeaders().getFirst("If-None-Match"))) {
+            ex.sendResponseHeaders(304, -1);
+            return;
+        }
         ex.sendResponseHeaders(200, asset.bytes().length);
         ex.getResponseBody().write(asset.bytes());
+    }
+
+    /** Strong validator derived from the content, so browsers revalidate cheaply with a 304. */
+    private static String etagOf(final byte[] bytes) {
+        try {
+            final byte[] digest = MessageDigest.getInstance("SHA-256").digest(bytes);
+            final StringBuilder sb = new StringBuilder("\"");
+            for (int i = 0; i < 8; i++) {
+                sb.append(String.format("%02x", digest[i]));
+            }
+            return sb.append('"').toString();
+        } catch (java.security.NoSuchAlgorithmException ex) {
+            throw new IllegalStateException(ex);
+        }
     }
 
     private static void sendJson(final HttpExchange ex, final int status, final Object body) throws IOException {
