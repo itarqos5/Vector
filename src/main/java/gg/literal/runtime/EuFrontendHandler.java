@@ -3,6 +3,7 @@ package gg.literal.runtime;
 import gg.literal.config.VectorConfig;
 import gg.literal.log.TerminalLogger;
 import io.netty.bootstrap.Bootstrap;
+import io.netty.buffer.ByteBuf;
 import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
@@ -58,6 +59,7 @@ public final class EuFrontendHandler extends ChannelInboundHandlerAdapter {
         clientAddressKey = ConnectionRegistry.toAddressKey(inboundChannel);
         clientIp = ConnectionRegistry.toIp(inboundChannel);
         vc.registry.register(clientAddressKey, inboundChannel);
+        Metrics.INSTANCE.connectionsTotal.increment();
 
         inboundChannel.config().setAutoRead(false);
         cfg = vc.config.get();
@@ -84,6 +86,7 @@ public final class EuFrontendHandler extends ChannelInboundHandlerAdapter {
             if (chosen == null) {
                 TerminalLogger.warn("No healthy backend available for " + clientIp
                     + (tried.isEmpty() ? "" : " (after " + tried.size() + " failed attempt(s))"));
+                Metrics.INSTANCE.noBackendAvailable.increment();
                 closeOnFlush(inboundChannel);
                 return;
             }
@@ -134,6 +137,7 @@ public final class EuFrontendHandler extends ChannelInboundHandlerAdapter {
                 if (override == null && attempts < cfg.backends().maxConnectAttempts()) {
                     connect(ctx, null); // fail over to another backend
                 } else {
+                    Metrics.INSTANCE.noBackendAvailable.increment();
                     closeOnFlush(inboundChannel);
                 }
                 return;
@@ -167,6 +171,9 @@ public final class EuFrontendHandler extends ChannelInboundHandlerAdapter {
     public void channelRead(final ChannelHandlerContext ctx, final Object msg) {
         final Channel out = outboundChannel;
         if (out != null && out.isActive()) {
+            if (msg instanceof ByteBuf buf) {
+                Metrics.INSTANCE.bytesFromClients.add(buf.readableBytes());
+            }
             out.writeAndFlush(msg).addListener((ChannelFutureListener) future -> {
                 if (!future.isSuccess()) {
                     closeOnFlush(out);

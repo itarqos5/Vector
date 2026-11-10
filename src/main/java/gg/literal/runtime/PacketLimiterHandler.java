@@ -38,6 +38,7 @@ public final class PacketLimiterHandler extends ChannelDuplexHandler {
         bytesInWindow += estimateBytes(msg);
 
         if (packetsInWindow > maxPacketsPerSecond || bytesInWindow > maxBytesPerSecond) {
+            Metrics.INSTANCE.blockedPacketLimit.increment();
             final String offender = formatRemote(ctx);
             TerminalLogger.warn("Rate-limiter drop: " + offender
                 + " exceeded threshold packets=" + packetsInWindow + "/" + maxPacketsPerSecond

@@ -3,6 +3,7 @@ package gg.literal.console;
 import gg.literal.log.TerminalLogger;
 import gg.literal.runtime.Backend;
 import gg.literal.runtime.BackendPool;
+import gg.literal.runtime.Metrics;
 import gg.literal.runtime.VectorContext;
 
 import java.io.BufferedReader;
@@ -81,6 +82,7 @@ public final class VectorConsole {
             }
 
             case "backends" -> backends();
+            case "stats" -> stats();
 
             case "kick" -> {
                 if (parts.length < 2) { TerminalLogger.warn("Usage: kick <ip>"); return; }
@@ -177,10 +179,41 @@ public final class VectorConsole {
         }
     }
 
+    private void stats() {
+        final Metrics m = Metrics.INSTANCE;
+        final long uptime = (System.currentTimeMillis() - m.startedAtMillis) / 1000;
+        TerminalLogger.info("Uptime " + (uptime / 3600) + "h " + ((uptime / 60) % 60) + "m " + (uptime % 60) + "s"
+            + " | connections active=" + ctx.registry.size() + " total=" + m.connectionsTotal.sum());
+        TerminalLogger.info("Traffic: from clients " + bytes(m.bytesFromClients.sum())
+            + ", to clients " + bytes(m.bytesToClients.sum()));
+        TerminalLogger.info("Blocked: ban=" + m.blockedBan.sum()
+            + " conn-limit=" + m.blockedConnectionLimit.sum()
+            + " conn-rate=" + m.blockedConnectionRate.sum()
+            + " packet-limit=" + m.blockedPacketLimit.sum()
+            + " whitelist=" + m.blockedWhitelist.sum());
+        TerminalLogger.info("Status pings: cache=" + m.statusFromCache.sum()
+            + " offline=" + m.statusOffline.sum()
+            + " backend=" + m.statusFromBackend.sum()
+            + " | no-backend drops=" + m.noBackendAvailable.sum());
+    }
+
+    private static String bytes(final long value) {
+        if (value < 1024) return value + " B";
+        final String[] units = {"KiB", "MiB", "GiB", "TiB"};
+        double v = value;
+        int unit = -1;
+        while (v >= 1024 && unit < units.length - 1) {
+            v /= 1024;
+            unit++;
+        }
+        return String.format("%.1f %s", v, units[unit]);
+    }
+
     private static void printHelp() {
         TerminalLogger.info("Vector commands:");
         TerminalLogger.info("  list                          - list active connections (backend)");
         TerminalLogger.info("  backends                      - show backend health, load and latency");
+        TerminalLogger.info("  stats                         - traffic, blocks and status ping counters");
         TerminalLogger.info("  kick <ip>                     - disconnect a player by IP");
         TerminalLogger.info("  send <ip> <backend>           - disconnect and route the next login to a named backend");
         TerminalLogger.info("  send <ip> <host> <port>        - transfer the client to another server (1.20.5+)");

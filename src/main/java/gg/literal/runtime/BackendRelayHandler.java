@@ -19,6 +19,9 @@ public final class BackendRelayHandler extends ChannelInboundHandlerAdapter {
     @Override
     public void channelRead(final ChannelHandlerContext ctx, final Object msg) {
         dataReceived = true;
+        if (msg instanceof io.netty.buffer.ByteBuf buf) {
+            Metrics.INSTANCE.bytesToClients.add(buf.readableBytes());
+        }
         if (inboundChannel.isActive()) {
             inboundChannel.writeAndFlush(msg).addListener(ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE);
             return;

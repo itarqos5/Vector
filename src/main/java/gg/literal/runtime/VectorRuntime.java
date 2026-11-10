@@ -42,6 +42,9 @@ public final class VectorRuntime {
         probeBackends(config, pool, healthChecker);
         healthChecker.start();
 
+        if (config.metrics().enabled()) {
+            new MetricsServer(context).start();
+        }
         new VectorConsole(context).start();
 
         EventLoopGroup bossGroup = null;
