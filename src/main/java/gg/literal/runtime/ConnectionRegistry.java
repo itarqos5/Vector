@@ -20,6 +20,14 @@ public final class ConnectionRegistry {
     /** Epoch millis at which the client connected. */
     public static final AttributeKey<Long> ATTR_CONNECTED_AT = AttributeKey.newInstance("vec-connected-at");
 
+    /** Bytes relayed for one connection. Written by the event loop, read by the dashboard. */
+    public static final class Traffic {
+        public final java.util.concurrent.atomic.AtomicLong fromClient = new java.util.concurrent.atomic.AtomicLong();
+        public final java.util.concurrent.atomic.AtomicLong toClient = new java.util.concurrent.atomic.AtomicLong();
+    }
+
+    public static final AttributeKey<Traffic> ATTR_TRAFFIC = AttributeKey.newInstance("vec-traffic");
+
     /** Read-only view of one open client connection. */
     public record ConnectionInfo(
         String ip,
@@ -27,7 +35,9 @@ public final class ConnectionRegistry {
         String player,
         String backend,
         long connectedAtMillis,
-        Integer protocol
+        Integer protocol,
+        long bytesFromClient,
+        long bytesToClient
     ) {
     }
 
@@ -130,6 +140,7 @@ public final class ConnectionRegistry {
 
     public void register(final String addressKey, final Channel channel) {
         channel.attr(ATTR_CONNECTED_AT).set(System.currentTimeMillis());
+        channel.attr(ATTR_TRAFFIC).set(new Traffic());
         activeChannels.put(addressKey, channel);
         keysByIp.compute(ipOfKey(addressKey), (ip, keys) -> {
             final Set<String> set = keys == null ? ConcurrentHashMap.newKeySet() : keys;
@@ -262,13 +273,16 @@ public final class ConnectionRegistry {
                 }
             }
             final Long since = channel.attr(ATTR_CONNECTED_AT).get();
+            final Traffic traffic = channel.attr(ATTR_TRAFFIC).get();
             out.add(new ConnectionInfo(
                 colon > 0 ? key.substring(0, colon) : key,
                 port,
                 channel.attr(MinecraftProtocolSniffer.ATTR_PLAYER_NAME).get(),
                 channel.attr(EuFrontendHandler.ATTR_BACKEND).get(),
                 since == null ? 0L : since,
-                channel.attr(MinecraftProtocolSniffer.ATTR_PROTOCOL_VERSION).get()
+                channel.attr(MinecraftProtocolSniffer.ATTR_PROTOCOL_VERSION).get(),
+                traffic == null ? 0L : traffic.fromClient.get(),
+                traffic == null ? 0L : traffic.toClient.get()
             ));
         }
         out.sort((a, b) -> Long.compare(b.connectedAtMillis(), a.connectedAtMillis()));

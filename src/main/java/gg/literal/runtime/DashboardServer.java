@@ -432,6 +432,8 @@ public final class DashboardServer {
             entry.put("backend", c.backend());
             entry.put("since", c.connectedAtMillis());
             entry.put("protocol", c.protocol());
+            entry.put("bytesIn", c.bytesFromClient());
+            entry.put("bytesOut", c.bytesToClient());
             connections.add(entry);
         }
         root.put("connections", connections);

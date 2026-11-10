@@ -453,6 +453,10 @@ public final class EuFrontendHandler extends ChannelInboundHandlerAdapter {
         }
         if (msg instanceof ByteBuf buf) {
             Metrics.INSTANCE.bytesFromClients.add(buf.readableBytes());
+            final ConnectionRegistry.Traffic traffic = inbound.attr(ConnectionRegistry.ATTR_TRAFFIC).get();
+            if (traffic != null) {
+                traffic.fromClient.addAndGet(buf.readableBytes());
+            }
         }
         // Writes are batched: the flush happens once per read loop in channelReadComplete.
         flushNeeded = true;

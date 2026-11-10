@@ -22,6 +22,10 @@ public final class BackendRelayHandler extends ChannelInboundHandlerAdapter {
         dataReceived = true;
         if (msg instanceof io.netty.buffer.ByteBuf buf) {
             Metrics.INSTANCE.bytesToClients.add(buf.readableBytes());
+            final ConnectionRegistry.Traffic traffic = inboundChannel.attr(ConnectionRegistry.ATTR_TRAFFIC).get();
+            if (traffic != null) {
+                traffic.toClient.addAndGet(buf.readableBytes());
+            }
         }
         if (inboundChannel.isActive()) {
             // Batched: flushed once per read loop in channelReadComplete.
