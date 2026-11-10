@@ -40,6 +40,10 @@ public final class MinecraftProtocolSniffer extends ChannelDuplexHandler {
     public static final AttributeKey<Integer> ATTR_NEXT_STATE =
             AttributeKey.newInstance("vec-next-state");
 
+    /** Normalised server address from the handshake, e.g. "lobby.example.com" (empty if absent). */
+    public static final AttributeKey<String> ATTR_HOSTNAME =
+            AttributeKey.newInstance("vec-hostname");
+
     /** Username from Login Start, once validated. */
     public static final AttributeKey<String> ATTR_PLAYER_NAME =
             AttributeKey.newInstance("vec-player-name");
@@ -216,7 +220,7 @@ public final class MinecraftProtocolSniffer extends ChannelDuplexHandler {
                 if (packetId == 0x00) {
                     protocolVersion = readVarInt(accumulator);
                     ctx.channel().attr(ATTR_PROTOCOL_VERSION).set(protocolVersion);
-                    readString(accumulator);          // server address (discard)
+                    ctx.channel().attr(ATTR_HOSTNAME).set(HostNames.normalize(readString(accumulator)));
                     accumulator.skipBytes(2);         // server port — unsigned short
                     final int nextState = readVarInt(accumulator);
                     ctx.channel().attr(ATTR_NEXT_STATE).set(nextState >= 1 && nextState <= 3 ? nextState : 0);
