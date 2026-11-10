@@ -61,6 +61,9 @@ public final class VectorRuntime {
         if (config.metrics().enabled()) {
             new MetricsServer(context).start();
         }
+        if (config.dashboard().enabled()) {
+            new DashboardServer(context).start();
+        }
         new VectorConsole(context).start();
 
         EventLoopGroup bossGroup = null;

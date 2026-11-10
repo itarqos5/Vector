@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Vector dashboard</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%233b2fe0'/%3E%3Cpath d='M8 9l8 15 8-15' fill='none' stroke='white' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<div id="login" class="login" hidden>
+  <form id="loginForm" class="login-card" autocomplete="off">
+    <div class="brand"><svg class="glyph" viewBox="0 0 32 32" aria-hidden="true"><path d="M8 9l8 15 8-15"/></svg><span class="brand-name">Vector</span></div>
+    <h1 class="login-title">Sign in to the dashboard</h1>
+    <label class="field">
+      <span class="label">Password</span>
+      <input id="loginPassword" type="password" required autofocus autocomplete="current-password">
+    </label>
+    <p id="loginError" class="form-error" role="alert" hidden></p>
+    <button class="primary" type="submit">Sign in</button>
+    <p class="muted small">The password is <code>dashboard-password</code> in config.json.</p>
+  </form>
+</div>
+
+<div id="app" hidden>
+  <header class="top">
+    <div class="brand">
+      <svg class="glyph" viewBox="0 0 32 32" aria-hidden="true"><path d="M8 9l8 15 8-15"/></svg>
+      <span class="brand-name">Vector</span>
+      <span id="bindLabel" class="brand-sub mono"></span>
+    </div>
+    <nav class="tabs" id="tabs" aria-label="Sections">
+      <button class="tab-btn" data-tab="overview" aria-current="page">Overview</button>
+      <button class="tab-btn" data-tab="players">Players</button>
+      <button class="tab-btn" data-tab="backends">Backends</button>
+      <button class="tab-btn" data-tab="access">Access</button>
+      <button class="tab-btn" data-tab="logs">Logs</button>
+      <button class="tab-btn" data-tab="config">Config</button>
+    </nav>
+    <div class="top-right">
+      <span id="liveState" class="live" data-state="connecting"><span class="live-dot"></span><span id="liveText">Connecting</span></span>
+      <button id="signout" class="ghost" hidden>Sign out</button>
+    </div>
+  </header>
+
+  <main class="page">
+
+    <!-- Overview -->
+    <section id="tab-overview" class="tab" aria-label="Overview">
+      <div class="card map-card">
+        <div class="card-head">
+          <h2>Where players are going</h2>
+          <p id="mapNote" class="muted small"></p>
+        </div>
+        <svg id="routeMap" class="route-map" role="img" aria-label="Traffic from clients through Vector to each backend"></svg>
+      </div>
+
+      <div class="strip" role="list">
+        <div class="strip-cell" role="listitem">
+          <span class="label">Players online</span>
+          <span id="sOnline" class="figure mono">0</span>
+          <span id="sOnlineSub" class="sub"></span>
+        </div>
+        <div class="strip-cell" role="listitem">
+          <span class="label">Traffic</span>
+          <span id="sTraffic" class="figure mono">0 B/s</span>
+          <span id="sTrafficSub" class="sub"></span>
+        </div>
+        <div class="strip-cell" role="listitem">
+          <span class="label">Server list pings</span>
+          <span id="sPings" class="figure mono">0</span>
+          <span id="sPingsSub" class="sub"></span>
+        </div>
+        <div class="strip-cell" role="listitem">
+          <span class="label">Refused connections</span>
+          <span id="sBlocked" class="figure mono">0</span>
+          <span id="sBlockedSub" class="sub"></span>
+        </div>
+      </div>
+
+      <div class="charts">
+        <figure class="card chart">
+          <figcaption>Open connections</figcaption>
+          <canvas id="chConns" aria-label="Open connections over the last 10 minutes"></canvas>
+          <div class="legend" id="lgConns"></div>
+        </figure>
+        <figure class="card chart">
+          <figcaption>Throughput</figcaption>
+          <canvas id="chTraffic" aria-label="Throughput over the last 10 minutes"></canvas>
+          <div class="legend" id="lgTraffic"></div>
+        </figure>
+        <figure class="card chart">
+          <figcaption>Events per second</figcaption>
+          <canvas id="chEvents" aria-label="Joins, pings and refused connections per second over the last 10 minutes"></canvas>
+          <div class="legend" id="lgEvents"></div>
+        </figure>
+      </div>
+    </section>
+
+    <!-- Players -->
+    <section id="tab-players" class="tab" aria-label="Players" hidden>
+      <div class="toolbar">
+        <label class="field inline">
+          <span class="label">Filter</span>
+          <input id="playerFilter" type="search" placeholder="Name, IP or backend">
+        </label>
+        <span id="playerCount" class="muted small"></span>
+      </div>
+      <div class="card flush">
+        <div class="table-wrap">
+          <table class="data" id="playersTable">
+            <thead><tr><th>Player</th><th>Address</th><th>Backend</th><th>Connected</th><th>Protocol</th><th class="actions-col">Actions</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <p id="playersEmpty" class="empty" hidden>Nobody is connected. Connections appear here as soon as a client joins or pings the server.</p>
+      </div>
+    </section>
+
+    <!-- Backends -->
+    <section id="tab-backends" class="tab" aria-label="Backends" hidden>
+      <div class="toolbar">
+        <span id="backendMode" class="muted small"></span>
+      </div>
+      <div class="card flush">
+        <div class="table-wrap">
+          <table class="data" id="backendsTable">
+            <thead><tr><th>Backend</th><th>Health</th><th>Address</th><th class="num">Weight</th><th class="num">Open</th><th class="num">Total</th><th class="num">Failed connects</th><th class="num">Latency</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+      <p class="muted small note">Health comes from a TCP connect to each backend. Edit the list in config.json, then use Reload on the Config tab.</p>
+    </section>
+
+    <!-- Access -->
+    <section id="tab-access" class="tab" aria-label="Access" hidden>
+      <div class="two-col">
+        <div class="card">
+          <div class="card-head"><h2>Bans</h2><span id="banCount" class="muted small"></span></div>
+          <form id="banForm" class="form-row" autocomplete="off">
+            <label class="field grow"><span class="label">IP or CIDR block</span><input id="banTarget" required placeholder="203.0.113.7 or 203.0.113.0/24"></label>
+            <label class="field narrow"><span class="label">Duration</span><input id="banDuration" placeholder="forever" aria-describedby="durHint"></label>
+            <label class="field grow"><span class="label">Reason</span><input id="banReason" placeholder="Optional"></label>
+            <button class="primary" type="submit">Ban</button>
+          </form>
+          <p id="durHint" class="muted small">Leave the duration empty for a permanent ban, or use 30m, 12h, 7d, 2w.</p>
+          <div class="table-wrap">
+            <table class="data" id="bansTable">
+              <thead><tr><th>Target</th><th>Expires</th><th>Reason</th><th class="actions-col"></th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <p id="bansEmpty" class="empty" hidden>No bans. Banned IPs are refused before they reach a backend.</p>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><h2>Whitelist</h2><span id="wlState" class="pill"></span></div>
+          <form id="wlForm" class="form-row" autocomplete="off">
+            <label class="field grow"><span class="label">Username, IP or CIDR block</span><input id="wlEntry" required placeholder="Notch or 198.51.100.0/24"></label>
+            <button class="primary" type="submit">Add</button>
+          </form>
+          <p class="muted small">Players are admitted when their username or IP matches an entry. Turn it on with <code>whitelist-enabled</code> in config.json.</p>
+          <div class="table-wrap">
+            <table class="data" id="wlTable">
+              <thead><tr><th>Entry</th><th class="actions-col"></th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <p id="wlEmpty" class="empty" hidden>The whitelist is empty. Add a username or IP to start building it.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Logs -->
+    <section id="tab-logs" class="tab" aria-label="Logs" hidden>
+      <div class="toolbar">
+        <label class="field inline">
+          <span class="label">Level</span>
+          <select id="logLevel">
+            <option value="ALL">All</option>
+            <option value="WARN">Warnings and errors</option>
+            <option value="ERROR">Errors only</option>
+          </select>
+        </label>
+        <label class="field inline">
+          <span class="label">Search</span>
+          <input id="logSearch" type="search" placeholder="Text in a message">
+        </label>
+        <label class="check"><input id="logFollow" type="checkbox" checked><span>Follow new lines</span></label>
+      </div>
+      <div class="card flush">
+        <div id="logBox" class="log" role="log" aria-live="off" tabindex="0"></div>
+      </div>
+    </section>
+
+    <!-- Config -->
+    <section id="tab-config" class="tab" aria-label="Config" hidden>
+      <div class="toolbar">
+        <button id="reloadBtn" class="primary">Reload config.json</button>
+        <span class="muted small">Applies backends, balancing, limits, status cache and whitelist settings without a restart.</span>
+      </div>
+      <div class="card flush">
+        <dl id="configList" class="kv"></dl>
+      </div>
+      <p class="muted small note">This is a read-only view. Secrets are shown only as set or not set.</p>
+    </section>
+
+  </main>
+</div>
+
+<dialog id="banDialog" class="dialog">
+  <form id="banDialogForm" method="dialog" autocomplete="off">
+    <h2 class="dialog-title">Ban <span id="banDialogName" class="mono"></span></h2>
+    <label class="field"><span class="label">IP or CIDR block</span><input id="bdTarget" required></label>
+    <label class="field"><span class="label">Duration</span><input id="bdDuration" placeholder="Leave empty for a permanent ban"></label>
+    <label class="field"><span class="label">Reason</span><input id="bdReason" placeholder="Optional"></label>
+    <div class="dialog-actions">
+      <button type="button" class="ghost" id="bdCancel">Cancel</button>
+      <button type="submit" class="danger">Ban and disconnect</button>
+    </div>
+  </form>
+</dialog>
+
+<div id="toasts" class="toasts" role="status" aria-live="polite"></div>
+
+<script src="/app.js" defer></script>
+</body>
+</html>
