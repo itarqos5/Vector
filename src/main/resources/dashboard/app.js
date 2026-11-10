@@ -213,10 +213,21 @@
     state.logSeq = d.logSeq;
 
     $('bindLabel').textContent = d.bind;
+    updateTitle(d);
     renderOverview(d);
     if (state.tab === 'players') renderPlayers(d);
     if (state.tab === 'backends') renderBackends(d);
     if (state.tab === 'access') renderAccess(d);
+  }
+
+  /** The tab title carries the essentials so a pinned tab is useful: players online, and a marker when backends are down. */
+  function updateTitle(d) {
+    const down = d.backends.filter((b) => !b.healthy).length;
+    const available = d.backends.filter((b) => b.healthy && !b.draining).length;
+    let prefix = `(${d.totals.connectionsActive})`;
+    if (d.backends.length && available === 0) prefix = '(offline)';
+    else if (down) prefix = `(${d.totals.connectionsActive}, ${down} down)`;
+    document.title = `${prefix} Vector dashboard`;
   }
 
   // ------------------------------------------------------------------ tabs
