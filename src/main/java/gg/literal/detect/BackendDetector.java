@@ -12,16 +12,55 @@ import java.nio.charset.StandardCharsets;
 
 public final class BackendDetector {
 
+    /** PROXY protocol v2 signature + version/command LOCAL + AF_UNSPEC + zero length. */
+    private static final byte[] PROXY_V2_LOCAL = {
+        0x0D, 0x0A, 0x0D, 0x0A, 0x00, 0x0D, 0x0A, 0x51, 0x55, 0x49, 0x54, 0x0A,
+        0x20, 0x00, 0x00, 0x00
+    };
+
     private BackendDetector() {
     }
 
     public static BackendType detect(final String host, final int port) {
+        return detect(host, port, false);
+    }
+
+    public static BackendType detect(final String host, final int port, final boolean proxyProtocol) {
+        final String json = fetchStatusJson(host, port, proxyProtocol, 2000, 3000, true);
+        if (json == null) {
+            return BackendType.UNKNOWN;
+        }
+        final BackendType type = classify(json);
+        final String versionName = extractVersionName(json);
+        TerminalLogger.info("Backend probe -> " + type.name()
+            + (versionName != null ? " [" + versionName + "]" : "")
+            + " at " + host + ":" + port);
+        return type;
+    }
+
+    /**
+     * Performs a Server List Ping against a backend and returns the raw status JSON, or {@code null} on
+     * any failure. When {@code proxyProtocol} is set a PROXY v2 LOCAL header is sent first, which is what
+     * backends configured to require the PROXY protocol expect from health-check style connections.
+     */
+    public static String fetchStatusJson(
+        final String host,
+        final int port,
+        final boolean proxyProtocol,
+        final int connectTimeoutMs,
+        final int readTimeoutMs,
+        final boolean logFailures
+    ) {
         try (Socket socket = new Socket()) {
-            socket.connect(new InetSocketAddress(host, port), 2000);
-            socket.setSoTimeout(3000);
+            socket.connect(new InetSocketAddress(host, port), connectTimeoutMs);
+            socket.setSoTimeout(readTimeoutMs);
 
             final OutputStream out = socket.getOutputStream();
             final InputStream in = socket.getInputStream();
+
+            if (proxyProtocol) {
+                out.write(PROXY_V2_LOCAL);
+            }
 
             // Handshake packet
             final ByteArrayOutputStream handshakePayload = new ByteArrayOutputStream();
@@ -46,26 +85,19 @@ public final class BackendDetector {
             readVarInt(in); // total packet length (discard)
             final int packetId = readVarInt(in);
             if (packetId != 0x00) {
-                return BackendType.UNKNOWN;
+                return null;
             }
 
             final int jsonLen = readVarInt(in);
             if (jsonLen <= 0 || jsonLen > 131072) {
-                return BackendType.UNKNOWN;
+                return null;
             }
-
-            final String json = new String(in.readNBytes(jsonLen), StandardCharsets.UTF_8);
-            final BackendType type = classify(json);
-            final String versionName = extractVersionName(json);
-
-            TerminalLogger.info("Backend probe -> " + type.name()
-                + (versionName != null ? " [" + versionName + "]" : "")
-                + " at " + host + ":" + port);
-
-            return type;
+            return new String(in.readNBytes(jsonLen), StandardCharsets.UTF_8);
         } catch (Exception ex) {
-            TerminalLogger.warn("Backend probe failed (" + host + ":" + port + "): " + ex.getMessage());
-            return BackendType.UNKNOWN;
+            if (logFailures) {
+                TerminalLogger.warn("Backend probe failed (" + host + ":" + port + "): " + ex.getMessage());
+            }
+            return null;
         }
     }
 

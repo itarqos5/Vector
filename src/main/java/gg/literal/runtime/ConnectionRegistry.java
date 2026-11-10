@@ -156,9 +156,27 @@ public final class ConnectionRegistry {
     public List<String> listConnections() {
         final List<String> out = new ArrayList<>();
         for (final Map.Entry<String, Channel> entry : activeChannels.entrySet()) {
-            out.add(entry.getKey() + " [" + (entry.getValue().isActive() ? "active" : "closed") + "]");
+            final Channel channel = entry.getValue();
+            final StringBuilder line = new StringBuilder(entry.getKey());
+            final String backend = channel.attr(EuFrontendHandler.ATTR_BACKEND).get();
+            if (backend != null) {
+                line.append(" -> ").append(backend);
+            }
+            line.append(" [").append(channel.isActive() ? "active" : "closed").append(']');
+            out.add(line.toString());
         }
         return out;
+    }
+
+    /**
+     * Routes the next connection from {@code ip} to {@code backend} and disconnects the player's current
+     * sessions so they reconnect straight onto it.
+     *
+     * @return number of sessions closed
+     */
+    public int sendToBackend(final String ip, final Backend backend) {
+        setNextBackend(ip, new InetSocketAddress(backend.host(), backend.port()));
+        return kickByIp(ip);
     }
 
     public int size() {

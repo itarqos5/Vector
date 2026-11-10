@@ -18,50 +18,93 @@ import io.netty.handler.codec.haproxy.HAProxyMessage;
 import io.netty.handler.codec.haproxy.HAProxyMessageEncoder;
 import io.netty.handler.codec.haproxy.HAProxyProxiedProtocol;
 import io.netty.handler.codec.haproxy.HAProxyProtocolVersion;
+import io.netty.util.AttributeKey;
 import io.netty.util.ReferenceCountUtil;
 
 import java.net.Inet4Address;
 import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.util.HashSet;
+import java.util.Set;
 
+/**
+ * Connects each client to a backend chosen by the {@link BackendPool}. If the connect fails the
+ * connection is retried on another backend before the client is dropped.
+ */
 public final class EuFrontendHandler extends ChannelInboundHandlerAdapter {
 
-    private final VectorConfig config;
-    private final ConnectionRegistry registry;
+    /** Name of the backend a connection is currently routed to (for the {@code list} command). */
+    public static final AttributeKey<String> ATTR_BACKEND = AttributeKey.newInstance("vec-backend");
+
+    private final VectorContext vc;
+    private VectorConfig cfg;
     private volatile Channel outboundChannel;
     private String clientAddressKey;
+    private String clientIp;
 
-    public EuFrontendHandler(final VectorConfig config, final ConnectionRegistry registry) {
-        this.config = config;
-        this.registry = registry;
+    private boolean closed;
+    private Backend held;
+    private final Set<Backend> tried = new HashSet<>();
+    private int attempts;
+
+    public EuFrontendHandler(final VectorContext vc) {
+        this.vc = vc;
     }
 
     @Override
     public void channelActive(final ChannelHandlerContext ctx) {
         final Channel inboundChannel = ctx.channel();
         clientAddressKey = ConnectionRegistry.toAddressKey(inboundChannel);
-        final String clientIp = ConnectionRegistry.toIp(inboundChannel);
-        registry.register(clientAddressKey, inboundChannel);
+        clientIp = ConnectionRegistry.toIp(inboundChannel);
+        vc.registry.register(clientAddressKey, inboundChannel);
 
         inboundChannel.config().setAutoRead(false);
+        cfg = vc.config.get();
 
         // Honour one-shot backend override set by the "send" console command
-        final java.net.InetSocketAddress backendOverride = registry.pollNextBackend(clientIp);
-        final String backendHost = backendOverride != null ? backendOverride.getHostString() : config.backends().targets().get(0).host();
-        final int backendPort = backendOverride != null ? backendOverride.getPort() : config.backends().targets().get(0).port();
+        connect(ctx, vc.registry.pollNextBackend(clientIp));
+    }
 
+    private void connect(final ChannelHandlerContext ctx, final InetSocketAddress override) {
+        final Channel inboundChannel = ctx.channel();
+
+        final Backend chosen;
+        final String backendHost;
+        final int backendPort;
+        if (override != null) {
+            backendHost = override.getHostString();
+            backendPort = override.getPort();
+            chosen = vc.pool.find(backendHost, backendPort);
+            if (chosen != null) {
+                vc.pool.acquire(chosen);
+            }
+        } else {
+            chosen = vc.pool.select(clientIp, tried);
+            if (chosen == null) {
+                TerminalLogger.warn("No healthy backend available for " + clientIp
+                    + (tried.isEmpty() ? "" : " (after " + tried.size() + " failed attempt(s))"));
+                closeOnFlush(inboundChannel);
+                return;
+            }
+            backendHost = chosen.host();
+            backendPort = chosen.port();
+        }
+        held = chosen;
+        inboundChannel.attr(ATTR_BACKEND).set(chosen != null ? chosen.name() : backendHost + ":" + backendPort);
+
+        final long startedAt = System.nanoTime();
         final Bootstrap bootstrap = new Bootstrap()
             .group(inboundChannel.eventLoop())
             .channel(NioSocketChannel.class)
             .option(ChannelOption.TCP_NODELAY, true)
             .option(ChannelOption.SO_KEEPALIVE, true)
             .option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)
-            .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, config.connectTimeoutMs())
+            .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, cfg.connectTimeoutMs())
             .handler(new ChannelInitializer<SocketChannel>() {
                 @Override
                 protected void initChannel(final SocketChannel ch) {
-                    if (config.proxyProtocol()) {
+                    if (cfg.proxyProtocol()) {
                         ch.pipeline().addLast("proxy-protocol-v2", HAProxyMessageEncoder.INSTANCE);
                     }
                     ch.pipeline().addLast("backend-relay", new BackendRelayHandler(inboundChannel));
@@ -72,16 +115,34 @@ public final class EuFrontendHandler extends ChannelInboundHandlerAdapter {
         outboundChannel = connectFuture.channel();
 
         connectFuture.addListener((ChannelFutureListener) future -> {
+            if (closed) {
+                future.channel().close();
+                return;
+            }
             if (!future.isSuccess()) {
                 final Throwable cause = future.cause();
                 final String reason = cause == null ? "unknown" : cause.getClass().getSimpleName() + ": " + cause.getMessage();
                 TerminalLogger.warn("Backend connection failed from " + formatAddress(inboundChannel.remoteAddress())
                     + " to " + backendHost + ":" + backendPort + " (" + reason + ")");
-                closeOnFlush(inboundChannel);
+                releaseHeld();
+                outboundChannel = null;
+                if (chosen != null) {
+                    tried.add(chosen);
+                    vc.pool.report(chosen, false, -1L);
+                }
+                attempts++;
+                if (override == null && attempts < cfg.backends().maxConnectAttempts()) {
+                    connect(ctx, null); // fail over to another backend
+                } else {
+                    closeOnFlush(inboundChannel);
+                }
                 return;
             }
+            if (chosen != null) {
+                vc.pool.report(chosen, true, (System.nanoTime() - startedAt) / 1_000_000L);
+            }
 
-            if (config.proxyProtocol()) {
+            if (cfg.proxyProtocol()) {
                 final HAProxyMessage header = buildProxyV2Header(inboundChannel, outboundChannel);
                 outboundChannel.writeAndFlush(header).addListener((ChannelFutureListener) writeFuture -> {
                     if (!writeFuture.isSuccess()) {
@@ -119,16 +180,34 @@ public final class EuFrontendHandler extends ChannelInboundHandlerAdapter {
 
     @Override
     public void channelInactive(final ChannelHandlerContext ctx) {
+        closed = true;
         if (clientAddressKey != null) {
-            registry.unregister(clientAddressKey);
+            vc.registry.unregister(clientAddressKey);
         }
-        closeOnFlush(outboundChannel);
+        releaseHeld();
+
+        final Channel out = outboundChannel;
+        if (out != null) {
+            if (out.isActive()) {
+                closeOnFlush(out);
+            } else {
+                out.close(); // still connecting: abort
+            }
+        }
     }
 
     @Override
     public void exceptionCaught(final ChannelHandlerContext ctx, final Throwable cause) {
         TerminalLogger.error("Frontend exception: " + cause.getMessage());
         closeOnFlush(ctx.channel());
+    }
+
+    private void releaseHeld() {
+        final Backend backend = held;
+        if (backend != null) {
+            held = null;
+            vc.pool.release(backend);
+        }
     }
 
     private static HAProxyMessage buildProxyV2Header(final Channel inbound, final Channel outbound) {

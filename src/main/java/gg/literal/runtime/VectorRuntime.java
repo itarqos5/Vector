@@ -14,6 +14,8 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 
 import java.nio.file.Path;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 
 public final class VectorRuntime {
 
@@ -21,15 +23,26 @@ public final class VectorRuntime {
     }
 
     public static void boot(final VectorConfig config) {
+        final ConfigHolder holder = new ConfigHolder(config);
+
         final BanList banList = new BanList(Path.of("ban-list.txt"));
         banList.load();
 
-        final ConnectionRegistry registry = new ConnectionRegistry();
+        final BackendPool pool = new BackendPool(holder);
 
-        TerminalLogger.info("Probing backend at " + config.backends().targets().get(0).host() + ":" + config.backends().targets().get(0).port() + "...");
-        BackendDetector.detect(config.backends().targets().get(0).host(), config.backends().targets().get(0).port());
+        final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2, runnable -> {
+            final Thread thread = new Thread(runnable, "vector-scheduler");
+            thread.setDaemon(true);
+            return thread;
+        });
 
-        new VectorConsole(registry, banList).start();
+        final HealthChecker healthChecker = new HealthChecker(pool, holder, scheduler);
+        final VectorContext context = new VectorContext(holder, new ConnectionRegistry(), banList, pool);
+
+        probeBackends(config, pool, healthChecker);
+        healthChecker.start();
+
+        new VectorConsole(context).start();
 
         EventLoopGroup bossGroup = null;
         EventLoopGroup workerGroup = null;
@@ -46,12 +59,12 @@ public final class VectorRuntime {
                 .childOption(ChannelOption.SO_KEEPALIVE, true)
                 .childOption(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)
                 .childOption(ChannelOption.RCVBUF_ALLOCATOR, new AdaptiveRecvByteBufAllocator(64, 2048, 65536))
-                .childHandler(new SecurePipelineInitializer(config, registry, banList));
+                .childHandler(new SecurePipelineInitializer(context));
 
             final Channel server = bootstrap.bind(config.bindHost(), config.bindPort()).syncUninterruptibly().channel();
             TerminalLogger.info(
                 "Vector online on " + config.bindHost() + ":" + config.bindPort()
-                    + " -> " + config.backends().targets().get(0).host() + ":" + config.backends().targets().get(0).port()
+                    + " -> " + pool.all().size() + " backend(s) [" + config.backends().mode().id() + "]"
                     + " | boss=" + config.bossThreads() + " worker=" + config.workerThreads()
             );
 
@@ -59,11 +72,27 @@ public final class VectorRuntime {
         } catch (Throwable throwable) {
             TerminalLogger.fatal("Netty runtime failed: " + throwable.getMessage());
         } finally {
+            healthChecker.stop();
+            scheduler.shutdownNow();
             if (workerGroup != null) {
                 workerGroup.shutdownGracefully().syncUninterruptibly();
             }
             if (bossGroup != null) {
                 bossGroup.shutdownGracefully().syncUninterruptibly();
+            }
+        }
+    }
+
+    /** Runs the first health round and identifies each reachable backend's server software. */
+    private static void probeBackends(final VectorConfig config, final BackendPool pool, final HealthChecker checker) {
+        TerminalLogger.info("Probing " + pool.all().size() + " backend(s)...");
+        checker.checkNow();
+        for (final Backend backend : pool.all()) {
+            if (backend.healthy()) {
+                BackendDetector.detect(backend.host(), backend.port(), config.proxyProtocol());
+            } else {
+                TerminalLogger.warn("Backend " + BackendPool.describe(backend)
+                    + " is unreachable at startup; it will be used once it comes up");
             }
         }
     }

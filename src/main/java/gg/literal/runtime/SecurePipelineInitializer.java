@@ -6,24 +6,24 @@ import io.netty.channel.socket.SocketChannel;
 
 public final class SecurePipelineInitializer extends ChannelInitializer<SocketChannel> {
 
-    private final VectorConfig config;
-    private final ConnectionRegistry registry;
+    private final VectorContext context;
     private final BanCheckHandler banCheckHandler;
 
-    public SecurePipelineInitializer(final VectorConfig config, final ConnectionRegistry registry, final BanList banList) {
-        this.config = config;
-        this.registry = registry;
-        this.banCheckHandler = new BanCheckHandler(banList);
+    public SecurePipelineInitializer(final VectorContext context) {
+        this.context = context;
+        this.banCheckHandler = new BanCheckHandler(context.banList);
     }
 
     @Override
     protected void initChannel(final SocketChannel channel) {
+        // Limits are read per connection so a config reload applies to every new connection.
+        final VectorConfig config = context.config.get();
         channel.pipeline().addLast("ban-check", banCheckHandler);
         channel.pipeline().addLast("mc-sniffer", new MinecraftProtocolSniffer());
         channel.pipeline().addLast("packet-limiter", new PacketLimiterHandler(
             config.maxBytesPerSecond(),
             config.maxPacketsPerSecond()
         ));
-        channel.pipeline().addLast("eu-frontend", new EuFrontendHandler(config, registry));
+        channel.pipeline().addLast("eu-frontend", new EuFrontendHandler(context));
     }
 }
