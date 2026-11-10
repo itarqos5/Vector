@@ -1,0 +1,12 @@
+target/
+tests/
+.git/
+.github/
+.idea/
+*.iml
+libraries/
+logs/
+config.json
+eula.txt
+ban-list.txt
+whitelist.txt
